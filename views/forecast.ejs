@@ -1,0 +1,238 @@
+<%- include("partials/head", { pageTitle, activeNav, appName }) %>
+
+<%
+  const warningLabelMap = {
+    red: "红色",
+    orange: "橙色",
+    yellow: "黄色",
+    green: "绿色",
+  };
+%>
+
+<section class="page-intro">
+  <p class="eyebrow">测算与预警</p>
+  <h2>师资测算与预警</h2>
+  <p>本页基于日报、老师时段可用性和时段配比配置，输出体验课师资压力、正价课师资压力以及热门时段并发预警。</p>
+</section>
+
+<% if (emptyState) { %>
+  <section class="card compact-card">
+    <p class="muted"><%= emptyState %></p>
+  </section>
+  <% if (warnings.length > 0) { %>
+    <section class="card compact-card">
+      <div class="section-heading">
+        <p class="eyebrow">数据提示</p>
+        <h3>数据提示</h3>
+      </div>
+      <div class="module-list">
+        <% warnings.forEach((warning) => { %>
+          <div class="module-item">
+            <p><%= warning %></p>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+<% } else { %>
+  <section class="content-grid single-column">
+    <article class="card">
+      <div class="section-heading">
+        <p class="eyebrow">体验课周度结果</p>
+        <h3>体验课周度师资压力</h3>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>周次</th>
+              <th>预计到课人数</th>
+              <th>周师资需求工时</th>
+              <th>周师资供给工时</th>
+              <th>工时差额</th>
+              <th>折算缺口老师数</th>
+              <th>利用率</th>
+              <th>预警等级</th>
+              <th>预警说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% trialWeeklyRows.forEach((row) => { %>
+              <tr>
+                <td><%= row.weekLabel %></td>
+                <td><%= row.projectedArrivals %></td>
+                <td><%= row.demandTeacherHours %></td>
+                <td><%= row.supplyTeacherHours %></td>
+                <td><%= row.gapTeacherHours %></td>
+                <td><%= row.shortageTeacherCount %></td>
+                <td><%= Number.isFinite(row.utilization) ? row.utilization.toFixed(2) : "供给为0" %></td>
+                <td><span class="level-badge level-<%= row.warningLevel %>"><%= warningLabelMap[row.warningLevel] || row.warningLevel %></span></td>
+                <td><%= row.warningMessage %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="section-heading">
+        <p class="eyebrow">正价课周度结果</p>
+        <h3>正价课周度师资压力</h3>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>周次</th>
+              <th>预计承载学员数</th>
+              <th>正价课需求工时</th>
+              <th>正价课供给工时</th>
+              <th>工时差额</th>
+              <th>折算缺口老师数</th>
+              <th>利用率</th>
+              <th>预警等级</th>
+              <th>预警说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% paidWeeklyRows.forEach((row) => { %>
+              <tr>
+                <td><%= row.weekLabel %></td>
+                <td><%= row.projectedStudents %></td>
+                <td><%= row.demandTeacherHours %></td>
+                <td><%= row.supplyTeacherHours %></td>
+                <td><%= row.gapTeacherHours %></td>
+                <td><%= row.shortageTeacherCount %></td>
+                <td><%= Number.isFinite(row.utilization) ? row.utilization.toFixed(2) : "供给为0" %></td>
+                <td><span class="level-badge level-<%= row.warningLevel %>"><%= warningLabelMap[row.warningLevel] || row.warningLevel %></span></td>
+                <td><%= row.warningMessage %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="section-heading">
+        <p class="eyebrow">热门时段预警</p>
+        <h3>热门时段并发缺口</h3>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>周次</th>
+              <th>日期</th>
+              <th>时段</th>
+              <th>时段需求老师数</th>
+              <th>时段供给老师数</th>
+              <th>时段缺口老师数</th>
+              <th>时段利用率</th>
+              <th>预警等级</th>
+              <th>预警说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% slotAlertRowsPreview.forEach((row) => { %>
+              <tr>
+                <td><%= row.weekLabel %></td>
+                <td><%= row.statDate %></td>
+                <td><%= row.slotCode %></td>
+                <td><%= row.slotDemand %></td>
+                <td><%= row.slotSupply %></td>
+                <td><%= row.shortageTeacherCount %></td>
+                <td><%= Number.isFinite(row.slotUtilization) ? row.slotUtilization.toFixed(2) : "供给为0" %></td>
+                <td><span class="level-badge level-<%= row.warningLevel %>"><%= warningLabelMap[row.warningLevel] || row.warningLevel %></span></td>
+                <td><%= row.warningMessage %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </article>
+  </section>
+
+  <% if (warnings.length > 0) { %>
+    <section class="card compact-card">
+      <div class="section-heading">
+        <p class="eyebrow">数据提示</p>
+        <h3>数据提示</h3>
+      </div>
+      <div class="module-list">
+        <% warnings.forEach((warning) => { %>
+          <div class="module-item">
+            <p><%= warning %></p>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+
+  <section class="card compact-card">
+    <details class="disclosure-panel">
+      <summary>
+        <span>体验课日级明细（默认收起）</span>
+        <small>展开查看每日推导过程</small>
+      </summary>
+      <div class="disclosure-body">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>统计日期</th>
+                <th>对应线索日期</th>
+                <th>延迟回溯线索量</th>
+                <th>预计到访人数</th>
+                <th>预计开班数</th>
+                <th>体验课师资需求工时</th>
+                <th>当日可供给工时</th>
+                <th>利用率</th>
+                <th>工时差额</th>
+                <th>预警等级</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% trialDailyRowsPreview.forEach((row) => { %>
+                <tr>
+                  <td><%= row.statDate %></td>
+                  <td><%= row.leadSourceDate %></td>
+                  <td><%= row.assignedLeads %></td>
+                  <td><%= row.trialArrivals %></td>
+                  <td><%= row.trialClasses %></td>
+                  <td><%= row.demandTeacherHours %></td>
+                  <td><%= row.supplyTeacherHours %></td>
+                  <td><%= Number.isFinite(row.utilization) ? row.utilization.toFixed(2) : "供给为0" %></td>
+                  <td><%= row.gapTeacherHours %></td>
+                  <td><span class="level-badge level-<%= row.warningLevel %>"><%= warningLabelMap[row.warningLevel] || row.warningLevel %></span></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+  </section>
+
+  <section class="card compact-card">
+    <details class="disclosure-panel">
+      <summary>
+        <span>测算参数说明（默认收起）</span>
+        <small>展开查看当前使用的关键参数</small>
+      </summary>
+      <div class="disclosure-body">
+        <div class="note-list">
+          <span class="tag">体验课延迟天数 = <%= settings.trial_delay_days %></span>
+          <span class="tag">体验课到访率 = <%= settings.trial_attend_rate %></span>
+          <span class="tag">体验课计划班容 = <%= settings.trial_class_size_plan %></span>
+          <span class="tag">续费率 = <%= settings.renewal_rate %></span>
+          <span class="tag">销售转化率 = <%= settings.sales_conversion_rate %></span>
+          <span class="tag">正价课单生周工时 = <%= settings.paid_weekly_hours_per_student %></span>
+        </div>
+      </div>
+    </details>
+  </section>
+<% } %>
+
+<%- include("partials/footer") %>

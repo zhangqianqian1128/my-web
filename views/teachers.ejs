@@ -1,0 +1,137 @@
+<%- include("partials/head", { pageTitle, activeNav, appName }) %>
+
+<section class="page-intro">
+  <p class="eyebrow">教师花名册</p>
+  <h2>教师档案管理</h2>
+  <p>支持手工维护、中文 CSV 模板下载、CSV 上传导入，以及导入后的覆盖更新。</p>
+</section>
+
+<section class="card compact-card">
+  <div class="section-heading">
+    <p class="eyebrow">CSV 导入</p>
+    <h3>教师花名册模板与导入</h3>
+  </div>
+  <div class="action-row">
+    <a class="secondary-link" href="/csv/templates/<%= teacherImportModule.templateKey %>">下载模板</a>
+  </div>
+  <form class="stack-form import-form" method="post" action="/teachers/import" enctype="multipart/form-data">
+    <label>
+      <span>上传 CSV 文件</span>
+      <input name="csv_file" type="file" accept=".csv,text/csv" required />
+    </label>
+    <div class="action-row">
+      <button type="submit">导入教师花名册</button>
+    </div>
+  </form>
+  <% if (importResult) { %>
+    <div class="notice <%= importResult.status === 'success' ? 'success' : 'error' %>">
+      <% if (importResult.status === "success") { %>
+        <strong>导入成功：</strong>
+        <span><%= importResult.fileName %>，共处理 <%= importResult.totalRows %> 行，成功导入 <%= importResult.importedCount %> 行。</span>
+      <% } else { %>
+        <strong>导入失败：</strong>
+        <span><%= importResult.fileName || "未选择文件" %></span>
+        <ul class="error-list">
+          <% importResult.errors.forEach((error) => { %>
+            <li>第 <%= error.line %> 行：<%= error.reason %></li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  <% } %>
+</section>
+
+<section class="content-grid">
+  <article class="card">
+    <div class="section-heading">
+      <p class="eyebrow"><%= formMode === "edit" ? "编辑教师" : "新增教师" %></p>
+      <h3><%= formMode === "edit" ? "编辑教师" : "新增教师" %></h3>
+    </div>
+    <% if (errorMessage) { %>
+      <p class="notice error"><%= errorMessage %></p>
+    <% } %>
+    <form class="stack-form" method="post" action="<%= formAction %>">
+      <label>
+        <span>教师姓名</span>
+        <input name="teacher_name" type="text" value="<%= teacher.teacher_name %>" required />
+      </label>
+      <label>
+        <span>课程类型</span>
+        <select name="course_type" required>
+          <option value="">请选择</option>
+          <option value="trial" <%= teacher.course_type === "trial" ? "selected" : "" %>>体验课</option>
+          <option value="paid" <%= teacher.course_type === "paid" ? "selected" : "" %>>正价课</option>
+          <option value="both" <%= teacher.course_type === "both" ? "selected" : "" %>>两者都可</option>
+        </select>
+      </label>
+      <label>
+        <span>用工类型</span>
+        <select name="employment_type" required>
+          <option value="full_time" <%= teacher.employment_type === "full_time" ? "selected" : "" %>>全职</option>
+          <option value="part_time" <%= teacher.employment_type === "part_time" ? "selected" : "" %>>兼职</option>
+          <option value="outsourced" <%= teacher.employment_type === "outsourced" ? "selected" : "" %>>外包</option>
+        </select>
+      </label>
+      <label>
+        <span>周课时</span>
+        <input name="weekly_hours" type="number" min="0" step="1" value="<%= teacher.weekly_hours %>" required />
+      </label>
+      <label class="checkbox-row">
+        <input name="enabled" type="checkbox" value="1" <%= Number(teacher.enabled) === 1 ? "checked" : "" %> />
+        <span>是否启用</span>
+      </label>
+      <div class="action-row">
+        <button type="submit"><%= formMode === "edit" ? "保存修改" : "新增教师" %></button>
+        <% if (formMode === "edit") { %>
+          <a class="secondary-link" href="/teachers/manage">取消编辑</a>
+        <% } %>
+      </div>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="section-heading">
+      <p class="eyebrow">教师列表</p>
+      <h3>教师列表</h3>
+    </div>
+    <% if (teachers.length === 0) { %>
+      <p class="muted">当前还没有教师数据，请先新增或导入。</p>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>教师ID</th>
+              <th>教师姓名</th>
+              <th>课程类型</th>
+              <th>用工类型</th>
+              <th>周课时</th>
+              <th>是否启用</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% teachers.forEach((item) => { %>
+              <tr>
+                <td><%= item.teacher_id %></td>
+                <td><%= item.teacher_name %></td>
+                <td><%= getFieldDisplayValue(teacherImportModule.fields.find((field) => field.name === "course_type"), item.course_type) %></td>
+                <td><%= getFieldDisplayValue(teacherImportModule.fields.find((field) => field.name === "employment_type"), item.employment_type) %></td>
+                <td><%= item.weekly_hours %></td>
+                <td><%= getFieldDisplayValue(teacherImportModule.fields.find((field) => field.name === "enabled"), item.enabled) %></td>
+                <td class="table-actions">
+                  <a class="secondary-link" href="/teachers/manage?edit=<%= item.teacher_id %>">编辑</a>
+                  <form method="post" action="/teachers/<%= item.teacher_id %>/delete">
+                    <button type="submit" class="danger-button">删除</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </article>
+</section>
+
+<%- include("partials/footer") %>

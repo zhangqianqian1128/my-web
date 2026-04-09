@@ -1,0 +1,85 @@
+# 删除旧的 .gitignore
+rm .gitignore
+
+# 创建适合 Node.js 项目的 .gitignore
+cat > .gitignore << 'EOF'
+# 依赖目录
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 环境变量
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+
+# 日志
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+lerna-debug.log*
+
+# 运行时数据
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# 覆盖目录
+.nyc_output
+coverage/
+
+# 构建产物
+build/
+dist/
+.out/
+.next/
+.nuxt/
+
+# 依赖包
+jspm_packages/
+
+# 可选缓存目录
+.cache/
+
+# 操作系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 临时文件
+.tmp/
+.temp/
+
+# 测试相关
+*.code-workspace
+
+# SQLite 数据库（你的数据文件夹）
+data/*.db
+data/*.sqlite
+*.db
+*.sqlite
+EOF
+node_modules
+.env
+.env.*
+*.sqlite
+*.sqlite3
+*.db
+.DS_Store

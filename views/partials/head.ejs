@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= pageTitle ? `${pageTitle} | ${appName}` : appName %></title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="<%= bodyClass || '' %>">
+    <header class="site-header">
+      <div class="container header-row">
+        <div>
+          <p class="eyebrow">独立测算系统</p>
+          <h1 class="brand"><%= appName %></h1>
+        </div>
+        <nav class="nav">
+          <% if (navMode === "predictors-only") { %>
+            <a class="<%= activeNav === 'simulator' ? 'is-active' : '' %>" href="/forecast/simulator/trial">师资预警</a>
+            <a class="<%= activeNav === 'headteacher-simulator' ? 'is-active' : '' %>" href="/forecast/headteacher-simulator">班主任预警</a>
+          <% } else { %>
+            <a class="<%= activeNav === 'dashboard' ? 'is-active' : '' %>" href="/">总览</a>
+            <a class="<%= activeNav === 'teachers' ? 'is-active' : '' %>" href="/teachers/manage">教师档案</a>
+            <a class="<%= activeNav === 'manual' ? 'is-active' : '' %>" href="/manual/lead-assignment-daily">手工录入</a>
+            <a class="<%= activeNav === 'imports' ? 'is-active' : '' %>" href="/imports">CSV 导入</a>
+            <a class="<%= activeNav === 'forecast' ? 'is-active' : '' %>" href="/forecast">测算预警</a>
+            <a class="<%= activeNav === 'future-forecast' ? 'is-active' : '' %>" href="/forecast/future">未来预测</a>
+            <a class="<%= activeNav === 'simulator' ? 'is-active' : '' %>" href="/forecast/simulator">快速预测器</a>
+            <a class="<%= activeNav === 'headteacher-simulator' ? 'is-active' : '' %>" href="/forecast/headteacher-simulator">班主任预警</a>
+            <a href="/health" target="_blank" rel="noreferrer">健康检查</a>
+          <% } %>
+        </nav>
+      </div>
+    </header>
+    <main class="container page-shell">

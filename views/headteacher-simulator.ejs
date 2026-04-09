@@ -1,0 +1,476 @@
+<%- include("partials/head", { pageTitle, activeNav, appName, navMode: "predictors-only", bodyClass: "predictor-shell" }) %>
+
+<%
+  const warningLabelMap = {
+    red: "红色",
+    orange: "橙色",
+    yellow: "黄色",
+    green: "绿色",
+  };
+%>
+
+<section class="card compact-card predictor-tabs-card">
+  <div class="module-tabs prominent-tabs">
+    <% predictorTabs.forEach((tab) => { %>
+      <a class="module-tab <%= tab.key === 'headteacher' ? 'is-active' : '' %>" href="<%= tab.href %>"><%= tab.label %></a>
+    <% }) %>
+  </div>
+</section>
+
+<section class="card">
+  <div class="section-heading">
+    <p class="eyebrow">集中输入</p>
+    <h3>预测配置</h3>
+  </div>
+
+  <% if (errorMessage) { %>
+    <p class="notice error"><%= errorMessage %></p>
+  <% } %>
+
+  <form class="stack-form simulator-form" method="post" action="/forecast/headteacher-simulator">
+    <section class="simulator-block">
+      <div class="section-heading">
+        <p class="eyebrow">区域 A</p>
+        <h3>预测周期</h3>
+      </div>
+      <div class="simulator-grid simulator-grid-3">
+        <label>
+          <span>预测月份</span>
+          <input name="forecast_month" type="month" value="<%= simulatorForm.period.forecastMonth %>" required />
+        </label>
+      </div>
+      <details class="inline-disclosure">
+        <summary>查看字段说明</summary>
+        <div class="disclosure-body">
+          <p class="field-help">当前轻量版先按单月预测输出，只围绕你选择的预测月份给出班主任容量和接新能力预警。</p>
+        </div>
+      </details>
+    </section>
+
+    <section class="simulator-block">
+      <div class="section-heading">
+        <p class="eyebrow">区域 B</p>
+        <h3>学员预测输入</h3>
+      </div>
+      <div class="simulator-grid simulator-grid-4">
+        <label>
+          <span>当前总服务学员去重数</span>
+          <input name="current_total_students" type="number" min="0" step="1" value="<%= simulatorForm.students.currentTotalStudents %>" required />
+        </label>
+        <label>
+          <span>本月到期续费人数</span>
+          <input name="renewal_due_students" type="number" min="0" step="1" value="<%= simulatorForm.students.renewalDueStudents %>" required />
+        </label>
+        <label>
+          <span>续费流失率</span>
+          <input name="renewal_churn_rate" type="number" min="0" max="1" step="0.01" value="<%= simulatorForm.students.renewalChurnRate %>" required />
+        </label>
+        <label>
+          <span>预计本月电商新增学员数</span>
+          <input name="monthly_ecom_new_students" type="number" min="0" step="1" value="<%= simulatorForm.students.monthlyEcomNewStudents %>" required />
+        </label>
+        <label>
+          <span>预计本月新签转正学员数</span>
+          <input name="monthly_sales_new_students" type="number" min="0" step="1" value="<%= simulatorForm.students.monthlySalesNewStudents %>" required />
+        </label>
+      </div>
+      <details class="inline-disclosure">
+        <summary>查看字段说明</summary>
+        <div class="disclosure-body">
+          <p class="field-help">系统会自动计算：预计本月续费流失人数 = 本月到期续费人数 × 续费流失率；本月新增学员数 = 电商新增 + 新签转正；本月末预计服务学员数 = 当前总服务学员数 - 预计本月续费流失人数 + 本月新增学员数。</p>
+        </div>
+      </details>
+    </section>
+
+    <section class="simulator-block">
+      <div class="section-heading">
+        <p class="eyebrow">区域 C</p>
+        <h3>班主任团队配置</h3>
+      </div>
+      <div class="simulator-grid simulator-grid-3">
+        <label>
+          <span>单个班主任默认服务人数上限</span>
+          <input id="default-service-limit" name="default_service_limit" type="number" min="1" step="1" value="<%= simulatorForm.team.defaultServiceLimit %>" required />
+        </label>
+        <label>
+          <span>单个新班主任默认月接新上限</span>
+          <input id="default-new-intake-limit" name="default_new_intake_limit" type="number" min="1" step="1" value="<%= simulatorForm.team.defaultNewIntakeLimit %>" required />
+        </label>
+      </div>
+
+      <div class="slot-config-card">
+        <div class="section-heading">
+          <p class="eyebrow">逐人配置</p>
+          <h3>班主任名单</h3>
+        </div>
+        <div class="team-member-rows" data-team-rows>
+          <% simulatorForm.team.rows.forEach((row) => { %>
+            <div class="team-member-row">
+              <label>
+                <span>班主任姓名</span>
+                <input name="ht_name[]" type="text" value="<%= row.name %>" required />
+              </label>
+              <label>
+                <span>当前服务学员数</span>
+                <input name="ht_current_students[]" type="number" min="0" step="1" value="<%= row.currentStudents %>" required />
+              </label>
+              <label>
+                <span>服务人数上限</span>
+                <input name="ht_service_limit[]" type="number" min="1" step="1" value="<%= row.serviceLimit %>" required />
+              </label>
+              <label>
+                <span>本月是否接新</span>
+                <select name="ht_can_take_new[]" data-take-new-toggle required>
+                  <% newToggleOptions.forEach((option) => { %>
+                    <option value="<%= option.value %>" <%= row.canTakeNew === option.value ? "selected" : "" %>><%= option.label %></option>
+                  <% }) %>
+                </select>
+              </label>
+              <label>
+                <span>本月可接新人数</span>
+                <input name="ht_new_capacity[]" type="number" min="0" step="1" value="<%= row.newCapacity %>" required />
+              </label>
+              <label>
+                <span>备注</span>
+                <input name="ht_notes[]" type="text" value="<%= row.notes %>" />
+              </label>
+              <button type="button" class="danger-button team-remove-button" data-remove-team-member>删除</button>
+            </div>
+          <% }) %>
+        </div>
+        <div class="action-row">
+          <button type="button" class="secondary-link add-team-button" data-add-team-member>新增班主任</button>
+        </div>
+        <details class="inline-disclosure">
+          <summary>查看字段说明</summary>
+          <div class="disclosure-body">
+            <p class="field-help">总服务容量看“每位班主任最多能稳定服务多少学员”，本月接新容量看“这批班主任这个月最多还能承接多少新学员”。两者会分别预警。</p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <details class="simulator-block disclosure-panel">
+      <summary>
+        <span>预测参数说明</span>
+        <small>默认收起，展开后查看口径</small>
+      </summary>
+      <div class="disclosure-body">
+        <p class="field-help">本月末预计服务学员数 = 当前总服务学员数 - 预计本月续费流失人数 + 本月新增学员数。</p>
+        <p class="field-help">预计本月续费流失人数 = 本月到期续费人数 × 续费流失率。</p>
+        <p class="field-help">总服务容量表示班主任团队最多能服务多少学员；本月接新容量表示这批班主任这个月最多还能接多少新学员。</p>
+        <p class="field-help">到岗建议优先看当前月份的总服务负载和接新能力；若接新缺口更大，会优先建议补充可接新的班主任。</p>
+      </div>
+    </details>
+
+    <div class="action-row simulator-submit-row">
+      <button type="submit">开始预测</button>
+    </div>
+  </form>
+</section>
+
+<% if (result) { %>
+  <section id="results-anchor" class="result-grid">
+    <article class="card result-card">
+      <div class="section-heading">
+        <p class="eyebrow">核心结论</p>
+        <h3>班主任整体预警等级</h3>
+      </div>
+      <div class="result-meta">
+        <span class="level-badge level-<%= result.summaryCards.overallWarning.level %>">
+          <%= warningLabelMap[result.summaryCards.overallWarning.level] || result.summaryCards.overallWarning.level %>
+        </span>
+      </div>
+      <p class="result-note"><%= result.summaryCards.overallWarning.note %></p>
+    </article>
+
+    <article class="card result-card">
+      <div class="section-heading">
+        <p class="eyebrow">核心结论</p>
+        <h3>缺口班主任人数</h3>
+      </div>
+      <div class="result-meta">
+        <strong><%= result.summaryCards.requiredHeadteachers.value %> 名</strong>
+      </div>
+      <p class="result-note"><%= result.summaryCards.requiredHeadteachers.note %></p>
+    </article>
+
+    <article class="card result-card">
+      <div class="section-heading">
+        <p class="eyebrow">核心结论</p>
+        <h3>建议到岗时间</h3>
+      </div>
+      <div class="result-meta">
+        <strong><%= result.summaryCards.arrivalRecommendation.timing %></strong>
+      </div>
+      <p class="result-note"><%= result.summaryCards.arrivalRecommendation.message %></p>
+    </article>
+  </section>
+
+  <section class="content-grid single-column">
+    <article class="card">
+      <div class="section-heading">
+        <p class="eyebrow">趋势结果</p>
+        <h3>月度趋势结果表</h3>
+      </div>
+      <details class="inline-disclosure">
+        <summary>查看字段说明</summary>
+        <div class="disclosure-body">
+          <p class="field-help">预警等级会同时看“总服务负载”和“本月接新能力”两条口径，取更严重者。缺口班主任人数会同时按总服务容量和月接新容量折算，再取更高值。</p>
+        </div>
+      </details>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>月份</th>
+              <th>预计服务学员数</th>
+              <th>总服务容量</th>
+              <th>总服务缺口人数</th>
+              <th>本月新增学员数</th>
+              <th>本月接新容量</th>
+              <th>本月接新缺口人数</th>
+              <th>预警等级</th>
+              <th>预警说明</th>
+              <th>到岗建议</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% result.monthRows.forEach((row) => { %>
+              <tr>
+                <td><%= row.monthLabel %></td>
+                <td><%= row.projectedStudentsMonthEnd %></td>
+                <td><%= row.totalServiceCapacity %></td>
+                <td><%= row.serviceGapStudents %></td>
+                <td><%= row.newStudentsThisMonth %></td>
+                <td><%= row.monthlyNewCapacity %></td>
+                <td><%= row.newIntakeGapStudents %></td>
+                <td><span class="level-badge level-<%= row.warningLevel %>"><%= warningLabelMap[row.warningLevel] || row.warningLevel %></span></td>
+                <td><%= row.warningMessage %></td>
+                <td><%= row.arrivalAdvice %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="section-heading">
+        <p class="eyebrow">辅助信息</p>
+        <h3>班主任负载表</h3>
+      </div>
+      <div class="summary-list">
+        <div class="summary-item">
+          <span>班主任当前总服务人数</span>
+          <strong><%= result.teamSummary.currentTeamStudents %> 人</strong>
+        </div>
+        <div class="summary-item">
+          <span>班主任总服务容量</span>
+          <strong><%= result.teamSummary.totalServiceCapacity %> 人</strong>
+        </div>
+        <div class="summary-item">
+          <span>班主任本月接新容量</span>
+          <strong><%= result.teamSummary.monthlyNewCapacity %> 人</strong>
+        </div>
+        <div class="summary-item">
+          <span>当前最高负载班主任</span>
+          <strong><%= result.teamSummary.highestLoadNames.join("、") %></strong>
+        </div>
+      </div>
+      <details class="inline-disclosure">
+        <summary>查看字段说明</summary>
+        <div class="disclosure-body">
+          <p class="field-help">服务人数上限影响“总服务容量”；本月可接新人数影响“本月接新容量”；当前服务学员数主要影响个人负载和风险提示。即使整体预警等级不变，这些容量数字也会直接变化。</p>
+          <p class="field-help">当前平均每位班主任服务 <strong><%= result.teamSummary.currentAverageServiceStudents %></strong> 人，最高个人负载率约为 <strong><%= `${Math.round(result.teamSummary.highestLoadRatio * 100)}%` %></strong>。</p>
+        </div>
+      </details>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>班主任姓名</th>
+              <th>当前服务学员数</th>
+              <th>服务人数上限</th>
+              <th>当前负载率</th>
+              <th>本月是否接新</th>
+              <th>本月可接新人数</th>
+              <th>风险提示</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% result.teamRows.forEach((row) => { %>
+              <tr>
+                <td><%= row.name %></td>
+                <td><%= row.currentStudents %></td>
+                <td><%= row.serviceLimit %></td>
+                <td><%= `${Math.round(row.loadUtilization * 100)}%` %></td>
+                <td><%= row.canTakeNew %></td>
+                <td><%= row.newCapacity %></td>
+                <td><%= row.riskMessage %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <details class="card compact-card disclosure-panel">
+      <summary>
+        <span>计算说明</span>
+        <small>默认收起，展开后查看当前试算口径</small>
+      </summary>
+      <div class="disclosure-body">
+        <div class="note-list">
+          <span class="tag">起始月份：<%= result.cycleSummary.forecastMonth %></span>
+          <span class="tag">本月到期续费人数：<%= result.studentsSummary.renewalDueStudents %> 人</span>
+          <span class="tag">续费流失率：<%= `${Math.round(result.studentsSummary.renewalChurnRate * 100)}%` %></span>
+          <span class="tag">预计本月续费流失人数：<%= result.studentsSummary.monthlyChurnStudents %> 人</span>
+          <span class="tag">本月新增学员数：<%= result.studentsSummary.newStudentsThisMonth %> 人</span>
+        </div>
+        <div class="module-list">
+          <% result.notes.forEach((note) => { %>
+            <div class="module-item">
+              <p><%= note %></p>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    </details>
+  </section>
+<% } %>
+
+<template id="team-member-template">
+  <div class="team-member-row">
+    <label>
+      <span>班主任姓名</span>
+      <input data-team-field="name" type="text" required />
+    </label>
+    <label>
+      <span>当前服务学员数</span>
+      <input data-team-field="current_students" type="number" min="0" step="1" value="0" required />
+    </label>
+    <label>
+      <span>服务人数上限</span>
+      <input data-team-field="service_limit" type="number" min="1" step="1" required />
+    </label>
+    <label>
+      <span>本月是否接新</span>
+      <select data-team-field="can_take_new" data-take-new-toggle required>
+        <% newToggleOptions.forEach((option) => { %>
+          <option value="<%= option.value %>"><%= option.label %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>
+      <span>本月可接新人数</span>
+      <input data-team-field="new_capacity" type="number" min="0" step="1" required />
+    </label>
+    <label>
+      <span>备注</span>
+      <input data-team-field="notes" type="text" />
+    </label>
+    <button type="button" class="danger-button team-remove-button" data-remove-team-member>删除</button>
+  </div>
+</template>
+
+<script>
+  (() => {
+    const template = document.getElementById("team-member-template");
+    const rowsContainer = document.querySelector("[data-team-rows]");
+    const addButton = document.querySelector("[data-add-team-member]");
+    const defaultServiceLimitInput = document.getElementById("default-service-limit");
+    const defaultNewIntakeLimitInput = document.getElementById("default-new-intake-limit");
+    const resultsAnchor = document.getElementById("results-anchor");
+
+    function bindRowNames() {
+      rowsContainer.querySelectorAll(".team-member-row").forEach((row) => {
+        row.querySelector('[data-team-field="name"], input[name="ht_name[]"]').setAttribute("name", "ht_name[]");
+        row
+          .querySelector('[data-team-field="current_students"], input[name="ht_current_students[]"]')
+          .setAttribute("name", "ht_current_students[]");
+        row
+          .querySelector('[data-team-field="service_limit"], input[name="ht_service_limit[]"]')
+          .setAttribute("name", "ht_service_limit[]");
+        row
+          .querySelector('[data-team-field="can_take_new"], select[name="ht_can_take_new[]"]')
+          .setAttribute("name", "ht_can_take_new[]");
+        row
+          .querySelector('[data-team-field="new_capacity"], input[name="ht_new_capacity[]"]')
+          .setAttribute("name", "ht_new_capacity[]");
+        row
+          .querySelector('[data-team-field="notes"], input[name="ht_notes[]"]')
+          .setAttribute("name", "ht_notes[]");
+      });
+    }
+
+    function syncTakeNewState(row) {
+      const select = row.querySelector('select[name="ht_can_take_new[]"], [data-team-field="can_take_new"]');
+      const newCapacityInput = row.querySelector('input[name="ht_new_capacity[]"], [data-team-field="new_capacity"]');
+
+      if (!select || !newCapacityInput) {
+        return;
+      }
+
+      if (select.value === "否") {
+        newCapacityInput.value = "0";
+      } else if (!newCapacityInput.value) {
+        newCapacityInput.value = defaultNewIntakeLimitInput?.value || "30";
+      }
+    }
+
+    bindRowNames();
+    rowsContainer.querySelectorAll(".team-member-row").forEach(syncTakeNewState);
+
+    if (addButton) {
+      addButton.addEventListener("click", () => {
+        const fragment = template.content.cloneNode(true);
+        const tempWrapper = document.createElement("div");
+        tempWrapper.appendChild(fragment);
+        const row = tempWrapper.firstElementChild;
+        row.querySelector('[data-team-field="service_limit"]').value =
+          defaultServiceLimitInput?.value || "250";
+        row.querySelector('[data-team-field="new_capacity"]').value =
+          defaultNewIntakeLimitInput?.value || "30";
+        rowsContainer.appendChild(row);
+        bindRowNames();
+        syncTakeNewState(row);
+      });
+    }
+
+    document.addEventListener("change", (event) => {
+      if (!event.target.matches('[data-take-new-toggle], select[name="ht_can_take_new[]"]')) {
+        return;
+      }
+
+      const row = event.target.closest(".team-member-row");
+      if (row) {
+        syncTakeNewState(row);
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      const removeButton = event.target.closest("[data-remove-team-member]");
+
+      if (!removeButton) {
+        return;
+      }
+
+      const row = removeButton.closest(".team-member-row");
+
+      if (!row || rowsContainer.querySelectorAll(".team-member-row").length <= 1) {
+        return;
+      }
+
+      row.remove();
+    });
+
+    if (resultsAnchor) {
+      window.requestAnimationFrame(() => {
+        resultsAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+  })();
+</script>
+
+<%- include("partials/footer") %>

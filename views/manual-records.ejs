@@ -1,0 +1,148 @@
+<%- include("partials/head", { pageTitle, activeNav, appName }) %>
+
+<section class="page-intro">
+  <p class="eyebrow">手工录入</p>
+  <h2><%= moduleConfig.title %></h2>
+  <p><%= moduleConfig.description %></p>
+  <% if (moduleConfig.notes && moduleConfig.notes.length > 0) { %>
+    <div class="note-list">
+      <% moduleConfig.notes.forEach((note) => { %>
+        <span class="tag"><%= note %></span>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+
+<section class="card compact-card">
+  <div class="module-tabs">
+    <% modules.forEach((item) => { %>
+      <a class="module-tab <%= item.slug === moduleConfig.slug ? "is-active" : "" %>" href="/manual/<%= item.slug %>">
+        <%= item.title %>
+      </a>
+    <% }) %>
+  </div>
+</section>
+
+<section class="card compact-card">
+  <div class="section-heading">
+    <p class="eyebrow">CSV 导入</p>
+    <h3><%= moduleConfig.title %>模板与导入</h3>
+  </div>
+  <div class="action-row">
+    <a class="secondary-link" href="/csv/templates/<%= moduleConfig.templateKey %>">下载模板</a>
+  </div>
+  <form class="stack-form import-form" method="post" action="/manual/<%= moduleConfig.slug %>/import" enctype="multipart/form-data">
+    <label>
+      <span>上传 CSV 文件</span>
+      <input name="csv_file" type="file" accept=".csv,text/csv" required />
+    </label>
+    <div class="action-row">
+      <button type="submit">导入 <%= moduleConfig.title %></button>
+    </div>
+  </form>
+  <% if (importResult) { %>
+    <div class="notice <%= importResult.status === 'success' ? 'success' : 'error' %>">
+      <% if (importResult.status === "success") { %>
+        <strong>导入成功：</strong>
+        <span><%= importResult.fileName %>，共处理 <%= importResult.totalRows %> 行，成功导入 <%= importResult.importedCount %> 行。</span>
+      <% } else { %>
+        <strong>导入失败：</strong>
+        <span><%= importResult.fileName || "未选择文件" %></span>
+        <ul class="error-list">
+          <% importResult.errors.forEach((error) => { %>
+            <li><%= error.line > 0 ? `第 ${error.line} 行` : "校验结果" %>：<%= error.reason %></li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </div>
+  <% } %>
+</section>
+
+<section class="content-grid">
+  <article class="card">
+    <div class="section-heading">
+      <p class="eyebrow"><%= formMode === "edit" ? "编辑记录" : "新增记录" %></p>
+      <h3><%= formMode === "edit" ? "编辑记录" : "新增记录" %></h3>
+    </div>
+    <% if (errorMessage) { %>
+      <p class="notice error"><%= errorMessage %></p>
+    <% } %>
+    <form class="stack-form" method="post" action="<%= formAction %>">
+      <% moduleConfig.fields.forEach((field) => { %>
+        <label>
+          <span><%= field.label %></span>
+          <% if (field.type === "enum") { %>
+            <select name="<%= field.name %>" required="<%= field.required ? 'required' : undefined %>">
+              <option value="">请选择</option>
+              <% (field.formOptions || field.options.map((option) => ({ value: option, label: option }))).forEach((option) => { %>
+                <option value="<%= option.value %>" <%= String(record[field.name]) === String(option.value) ? "selected" : "" %>><%= option.label %></option>
+              <% }) %>
+            </select>
+          <% } else { %>
+            <input
+              name="<%= field.name %>"
+              type="<%= field.type === 'date' ? 'date' : field.type === 'month' ? 'month' : field.type === 'integer' || field.type === 'number' ? 'number' : 'text' %>"
+              <% if (typeof field.min === 'number') { %>min="<%= field.min %>"<% } %>
+              <% if (typeof field.max === 'number') { %>max="<%= field.max %>"<% } %>
+              <% if (field.type === 'number') { %>step="<%= field.step || '0.01' %>"<% } %>
+              <% if (field.type === 'integer') { %>step="1"<% } %>
+              value="<%= record[field.name] %>"
+              <%= field.required ? 'required' : '' %>
+            />
+          <% } %>
+          <% if (field.helpText) { %>
+            <small class="field-help"><%= field.helpText %></small>
+          <% } %>
+        </label>
+      <% }) %>
+      <div class="action-row">
+        <button type="submit"><%= formMode === "edit" ? "保存修改" : "新增记录" %></button>
+        <% if (formMode === "edit") { %>
+          <a class="secondary-link" href="/manual/<%= moduleConfig.slug %>">取消编辑</a>
+        <% } %>
+      </div>
+    </form>
+  </article>
+
+  <article class="card">
+    <div class="section-heading">
+      <p class="eyebrow">数据列表</p>
+      <h3><%= moduleConfig.title %>列表</h3>
+    </div>
+    <% if (records.length === 0) { %>
+      <p class="muted">当前还没有记录，请先新增或导入。</p>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>id</th>
+              <% moduleConfig.fields.forEach((field) => { %>
+                <th><%= field.label %></th>
+              <% }) %>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% records.forEach((item) => { %>
+              <tr>
+                <td><%= item.id %></td>
+                <% moduleConfig.fields.forEach((field) => { %>
+                  <td><%= getFieldDisplayValue(field, item[field.name]) %></td>
+                <% }) %>
+                <td class="table-actions">
+                  <a class="secondary-link" href="/manual/<%= moduleConfig.slug %>?edit=<%= item.id %>">编辑</a>
+                  <form method="post" action="/manual/<%= moduleConfig.slug %>/<%= item.id %>/delete">
+                    <button type="submit" class="danger-button">删除</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </article>
+</section>
+
+<%- include("partials/footer") %>

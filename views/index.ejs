@@ -1,0 +1,210 @@
+<%- include("partials/head", { pageTitle, activeNav, appName }) %>
+
+<%
+  const warningLabelMap = {
+    red: "红色",
+    orange: "橙色",
+    yellow: "黄色",
+    green: "绿色",
+    neutral: "待补数据",
+  };
+%>
+
+<section class="hero-panel">
+  <div>
+    <p class="eyebrow">测算预警总览</p>
+    <h2><%= heroTitle %></h2>
+    <p class="hero-copy"><%= heroDescription %></p>
+  </div>
+  <div class="hero-callout">
+    <span class="callout-label">当前入口</span>
+    <strong><a href="/forecast">进入测算预警页</a></strong>
+    <p class="muted">当前版本已支持按具体时段测算老师可用性，并输出周度预警结果。</p>
+  </div>
+</section>
+
+<section class="result-grid">
+  <article class="card result-card">
+    <div class="section-heading">
+      <p class="eyebrow">核心结论</p>
+      <h3>体验课周度预警</h3>
+    </div>
+    <% if (!forecastPreview.summaryCards.trial) { %>
+      <p class="muted"><%= forecastPreview.emptyState || "当前还没有体验课周度结果。" %></p>
+    <% } else { %>
+      <div class="result-meta">
+        <span class="level-badge level-<%= forecastPreview.summaryCards.trial.warningLevel %>">
+          <%= warningLabelMap[forecastPreview.summaryCards.trial.warningLevel] || forecastPreview.summaryCards.trial.warningLevel %>
+        </span>
+        <strong><%= forecastPreview.summaryCards.trial.weekLabel %></strong>
+      </div>
+      <div class="result-metric-list">
+        <div class="result-metric">
+          <span>折算缺口老师数</span>
+          <strong><%= forecastPreview.summaryCards.trial.shortageTeacherCount %> 名</strong>
+        </div>
+        <div class="result-metric">
+          <span>工时差额</span>
+          <strong><%= forecastPreview.summaryCards.trial.gapTeacherHours %> 工时</strong>
+        </div>
+      </div>
+      <p class="result-note"><%= forecastPreview.summaryCards.trial.warningMessage %></p>
+    <% } %>
+  </article>
+
+  <article class="card result-card">
+    <div class="section-heading">
+      <p class="eyebrow">核心结论</p>
+      <h3>正价课周度预警</h3>
+    </div>
+    <% if (!forecastPreview.summaryCards.paid) { %>
+      <p class="muted"><%= forecastPreview.emptyState || "当前还没有正价课周度结果。" %></p>
+    <% } else { %>
+      <div class="result-meta">
+        <span class="level-badge level-<%= forecastPreview.summaryCards.paid.warningLevel %>">
+          <%= warningLabelMap[forecastPreview.summaryCards.paid.warningLevel] || forecastPreview.summaryCards.paid.warningLevel %>
+        </span>
+        <strong><%= forecastPreview.summaryCards.paid.weekLabel %></strong>
+      </div>
+      <div class="result-metric-list">
+        <div class="result-metric">
+          <span>折算缺口老师数</span>
+          <strong><%= forecastPreview.summaryCards.paid.shortageTeacherCount %> 名</strong>
+        </div>
+        <div class="result-metric">
+          <span>工时差额</span>
+          <strong><%= forecastPreview.summaryCards.paid.gapTeacherHours %> 工时</strong>
+        </div>
+      </div>
+      <p class="result-note"><%= forecastPreview.summaryCards.paid.warningMessage %></p>
+    <% } %>
+  </article>
+
+  <article class="card result-card">
+    <div class="section-heading">
+      <p class="eyebrow">核心结论</p>
+      <h3>热门时段预警</h3>
+    </div>
+    <% if (!forecastPreview.summaryCards.slot) { %>
+      <p class="muted">当前还没有热门时段预警结果，请先补充老师时段可用性和时段需求占比。</p>
+    <% } else { %>
+      <div class="result-meta">
+        <span class="level-badge level-<%= forecastPreview.summaryCards.slot.warningLevel %>">
+          <%= warningLabelMap[forecastPreview.summaryCards.slot.warningLevel] || forecastPreview.summaryCards.slot.warningLevel %>
+        </span>
+        <strong><%= `${forecastPreview.summaryCards.slot.weekLabel} / ${forecastPreview.summaryCards.slot.slotCode}` %></strong>
+      </div>
+      <div class="result-metric-list">
+        <div class="result-metric">
+          <span>时段缺口老师数</span>
+          <strong><%= forecastPreview.summaryCards.slot.shortageTeacherCount %> 名</strong>
+        </div>
+        <div class="result-metric">
+          <span>时段缺口</span>
+          <strong><%= forecastPreview.summaryCards.slot.slotGap %> 名</strong>
+        </div>
+      </div>
+      <p class="result-note"><%= forecastPreview.summaryCards.slot.warningMessage %></p>
+    <% } %>
+  </article>
+</section>
+
+<section class="card compact-card">
+  <div class="action-row">
+    <a class="secondary-link" href="/forecast">查看完整周测算与预警</a>
+  </div>
+</section>
+
+<section class="content-grid">
+  <article class="card">
+    <div class="section-heading">
+      <p class="eyebrow">时段预警</p>
+      <h3>热门时段预警预览</h3>
+    </div>
+    <% if (forecastPreview.slotAlerts.length === 0) { %>
+      <p class="muted">当前还没有热门时段结果，请先补充老师时段可用性和时段需求占比。</p>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th>时段</th>
+              <th>时段缺口老师数</th>
+              <th>时段利用率</th>
+              <th>预警等级</th>
+              <th>预警说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% forecastPreview.slotAlerts.forEach((item) => { %>
+              <tr>
+                <td><%= item.statDate %></td>
+                <td><%= item.slotCode %></td>
+                <td><%= item.shortageTeacherCount %></td>
+                <td><%= Number.isFinite(item.slotUtilization) ? item.slotUtilization.toFixed(2) : "供给为0" %></td>
+                <td><span class="level-badge level-<%= item.warningLevel %>"><%= warningLabelMap[item.warningLevel] || item.warningLevel %></span></td>
+                <td><%= item.warningMessage %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </article>
+
+  <article class="card">
+    <div class="section-heading">
+      <p class="eyebrow">能力范围</p>
+      <h3>当前已落地能力</h3>
+    </div>
+    <div class="module-list">
+      <% modules.forEach((module) => { %>
+        <div class="module-item">
+          <strong><%= module.title %></strong>
+          <p><%= module.description %></p>
+        </div>
+      <% }) %>
+    </div>
+  </article>
+</section>
+
+<section class="card compact-card">
+  <div class="section-heading">
+    <p class="eyebrow">数据提示</p>
+    <h3>当前数据提醒</h3>
+  </div>
+  <% if (forecastPreview.warnings.length === 0) { %>
+    <p class="notice success">当前关键输入已具备，测算逻辑可正常运行。</p>
+  <% } else { %>
+    <div class="module-list">
+      <% forecastPreview.warnings.forEach((warning) => { %>
+        <div class="module-item">
+          <p><%= warning %></p>
+        </div>
+      <% }) %>
+    </div>
+  <% } %>
+</section>
+
+<section class="card compact-card">
+  <details class="disclosure-panel">
+    <summary>
+      <span>数据准备情况</span>
+      <small>查看已录入的数据与配置规模</small>
+    </summary>
+    <div class="disclosure-body">
+      <div class="stats-grid stats-grid-7 compact-stats-grid">
+        <% stats.forEach((stat) => { %>
+          <article class="card stat-card compact-stat-card">
+            <span class="stat-label"><%= stat.label %></span>
+            <strong class="stat-value"><%= stat.value %></strong>
+            <p class="muted"><%= stat.hint %></p>
+          </article>
+        <% }) %>
+      </div>
+    </div>
+  </details>
+</section>
+
+<%- include("partials/footer") %>

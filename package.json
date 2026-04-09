@@ -1,0 +1,20 @@
+{
+  "name": "teacher-warning-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "体验课与正价课师资测算和预警系统",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/routes/pages.js && node --check src/routes/crud.js && node --check src/config/env.js && node --check src/config/manualModules.js && node --check src/config/slotCodes.js && node --check src/db/connection.js && node --check src/db/migrate.js && node --check src/db/seedDemo.js && node --check src/services/dashboardService.js && node --check src/services/forecastService.js && node --check src/services/futureForecastService.js && node --check src/services/simulatorService.js && node --check src/services/headteacherSimulatorService.js && node --check src/services/predictorConfigService.js && node --check src/services/teacherService.js && node --check src/services/manualEntryService.js && node --check src/services/csvService.js && node --check src/services/importService.js",
+    "db:init": "node -e \"require('./src/db/migrate').migrate()\"",
+    "demo:init": "node src/db/seedDemo.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "multer": "^2.0.2"
+  }
+}

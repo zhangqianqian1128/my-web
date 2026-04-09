@@ -1,0 +1,37 @@
+<%- include("partials/head", { pageTitle, activeNav, appName }) %>
+
+<section class="page-intro">
+  <p class="eyebrow">CSV 导入</p>
+  <h2>CSV 模板与导入中心</h2>
+  <p>这里汇总当前所有模板下载入口，以及对应的页面跳转。进入页面后即可上传 CSV 并查看导入结果。</p>
+</section>
+
+<section class="content-grid single-column">
+  <article class="card">
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>模板</th>
+            <th>说明</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% pages.forEach((page) => { %>
+            <tr>
+              <td><%= page.title %></td>
+              <td><%= page.description %><br /><span class="muted"><%= page.templateKey %></span></td>
+              <td class="table-actions">
+                <a class="secondary-link" href="<%= page.templateRoute %>">下载模板</a>
+                <a class="secondary-link" href="<%= page.pageRoute %>">进入页面</a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </article>
+</section>
+
+<%- include("partials/footer") %>
