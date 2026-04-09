@@ -6,7 +6,7 @@
     <title><%= pageTitle ? `${pageTitle} | ${appName}` : appName %></title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <body class="<%= bodyClass || '' %>">
+  <<body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
     <header class="site-header">
       <div class="container header-row">
         <div>
