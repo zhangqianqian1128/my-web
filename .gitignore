@@ -1,15 +1,7 @@
-# 删除旧的 .gitignore
-rm .gitignore
-
-# 创建适合 Node.js 项目的 .gitignore
-cat > .gitignore << 'EOF'
-# 依赖目录
+# Node dependencies
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
 
-# 环境变量
+# Environment variables
 .env
 .env.local
 .env.development.local
@@ -17,37 +9,34 @@ yarn-error.log*
 .env.production.local
 .env*.local
 
-# 日志
+# Logs
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 lerna-debug.log*
 
-# 运行时数据
+# Runtime data
 pids
 *.pid
 *.seed
 *.pid.lock
 
-# 覆盖目录
-.nyc_output
+# Coverage and build output
 coverage/
-
-# 构建产物
 build/
 dist/
 .out/
 .next/
 .nuxt/
 
-# 依赖包
+# Dependency folders
 jspm_packages/
 
-# 可选缓存目录
+# Optional caches
 .cache/
 
-# 操作系统文件
+# OS and editor files
 .DS_Store
 .DS_Store?
 ._*
@@ -55,31 +44,21 @@ jspm_packages/
 .Trashes
 ehthumbs.db
 Thumbs.db
-
-# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# 临时文件
+# Temporary files
 .tmp/
 .temp/
 
-# 测试相关
+# Test workspaces
 *.code-workspace
 
-# SQLite 数据库（你的数据文件夹）
+# SQLite databases
 data/*.db
 data/*.sqlite
 *.db
 *.sqlite
-EOF
-node_modules
-.env
-.env.*
-*.sqlite
-*.sqlite3
-*.db
-.DS_Store

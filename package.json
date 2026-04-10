@@ -2,6 +2,9 @@
   "name": "teacher-warning-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=24 <25"
+  },
   "description": "体验课与正价课师资测算和预警系统",
   "main": "src/server.js",
   "scripts": {
