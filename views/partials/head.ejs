@@ -1,5 +1,12 @@
-<!DOCTYPE<% var activeNav = typeof activeNav !== 'undefined' ? activeNav : '' %>
- html>
+<%
+  var pageTitle = typeof pageTitle !== 'undefined' ? pageTitle : ''
+  var activeNav = typeof activeNav !== 'undefined' ? activeNav : ''
+  var appName = typeof appName !== 'undefined' ? appName : ''
+  var bodyClass = typeof bodyClass !== 'undefined' ? bodyClass : ''
+  var navMode = typeof navMode !== 'undefined' ? navMode : ''
+%>
+
+<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
@@ -7,7 +14,7 @@
     <title><%= pageTitle ? `${pageTitle} | ${appName}` : appName %></title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
-  <<body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>">
+  <body class="<%= bodyClass %>">
     <header class="site-header">
       <div class="container header-row">
         <div>
