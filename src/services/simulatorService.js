@@ -1,14 +1,16 @@
 const { getUtilizationWarningLevel, getSlotWarningLevel } = require("./forecastService");
 
-const WEEKDAY_OPTIONS = [
-  { value: "周一", label: "周一" },
-  { value: "周二", label: "周二" },
-  { value: "周三", label: "周三" },
-  { value: "周四", label: "周四" },
-  { value: "周五", label: "周五" },
-  { value: "周六", label: "周六" },
-  { value: "周日", label: "周日" },
+const WEEKDAY_FIELD_DEFINITIONS = [
+  { key: "monday", value: "周一", label: "周一", defaultRatio: "14.29" },
+  { key: "tuesday", value: "周二", label: "周二", defaultRatio: "14.29" },
+  { key: "wednesday", value: "周三", label: "周三", defaultRatio: "14.29" },
+  { key: "thursday", value: "周四", label: "周四", defaultRatio: "14.29" },
+  { key: "friday", value: "周五", label: "周五", defaultRatio: "14.28" },
+  { key: "saturday", value: "周六", label: "周六", defaultRatio: "14.28" },
+  { key: "sunday", value: "周日", label: "周日", defaultRatio: "14.28" },
 ];
+
+const WEEKDAY_OPTIONS = WEEKDAY_FIELD_DEFINITIONS.map(({ value, label }) => ({ value, label }));
 
 const SUMMARY_GRANULARITY_OPTIONS = [
   { value: "week", label: "按周" },
@@ -129,6 +131,20 @@ function computeWeekUnits(startDate, endDate) {
   return roundTo(diffDaysInclusive(startDate, endDate) / 7, 2);
 }
 
+function getWeekdayLabelByDate(date) {
+  const weekdayMap = {
+    0: "周日",
+    1: "周一",
+    2: "周二",
+    3: "周三",
+    4: "周四",
+    5: "周五",
+    6: "周六",
+  };
+
+  return weekdayMap[date.getUTCDay()] || "";
+}
+
 function buildDefaultSlotRows(rows) {
   if (rows && rows.length > 0) {
     return rows;
@@ -222,6 +238,58 @@ function buildDefaultTeacherStageRows(overrides = {}) {
   }));
 }
 
+function buildDefaultWeekdayRatioRows(overrides = {}) {
+  return WEEKDAY_FIELD_DEFINITIONS.map((definition) => ({
+    key: definition.key,
+    dayOfWeek: definition.value,
+    label: definition.label,
+    ratio: normalizePercentString(
+      overrides[definition.key] ?? definition.defaultRatio,
+      definition.defaultRatio
+    ),
+  }));
+}
+
+function buildWeekdayRatioRows(rows, fallbackRows = []) {
+  const sourceMap = new Map();
+  const fallbackMap = new Map();
+
+  (rows || []).forEach((row) => {
+    const weekdayKey =
+      row?.key ||
+      WEEKDAY_FIELD_DEFINITIONS.find(
+        (definition) => definition.value === normalizeWeekdayString(row?.dayOfWeek)
+      )?.key;
+
+    if (weekdayKey) {
+      sourceMap.set(weekdayKey, row);
+    }
+  });
+
+  (fallbackRows || []).forEach((row) => {
+    if (row?.key) {
+      fallbackMap.set(row.key, row);
+    }
+  });
+
+  return WEEKDAY_FIELD_DEFINITIONS.map((definition) => {
+    const source = sourceMap.get(definition.key);
+    const fallback = fallbackMap.get(definition.key);
+    const hasSourceRatio = source && Object.prototype.hasOwnProperty.call(source, "ratio");
+    const fallbackRatio = fallback?.ratio ?? definition.defaultRatio;
+
+    return {
+      key: definition.key,
+      dayOfWeek: definition.value,
+      label: definition.label,
+      ratio: normalizePercentString(
+        hasSourceRatio ? source.ratio : fallbackRatio,
+        hasSourceRatio ? "0.00" : fallbackRatio
+      ),
+    };
+  });
+}
+
 function buildTeacherStageRows(rows, fallbackRows = []) {
   const sourceMap = new Map();
   const fallbackMap = new Map();
@@ -289,9 +357,21 @@ function hydrateTeacherStageRows(courseConfig, fallbackRows) {
   return buildTeacherStageRows(fallbackRows, fallbackRows);
 }
 
+function hydrateWeekdayRatioRows(courseConfig, fallbackRows) {
+  if (Array.isArray(courseConfig?.weekdayRatioRows) && courseConfig.weekdayRatioRows.length > 0) {
+    return buildWeekdayRatioRows(courseConfig.weekdayRatioRows, fallbackRows);
+  }
+
+  if (Array.isArray(courseConfig?.weekdayRatios) && courseConfig.weekdayRatios.length > 0) {
+    return buildWeekdayRatioRows(courseConfig.weekdayRatios, fallbackRows);
+  }
+
+  return buildWeekdayRatioRows(fallbackRows, fallbackRows);
+}
+
 function buildDefaultSimulatorForm() {
   return {
-    formVersion: 3,
+    formVersion: 4,
     period: {
       startDate: "2026-05-01",
       endDate: "2026-05-28",
@@ -311,6 +391,7 @@ function buildDefaultSimulatorForm() {
         part_time_rookie: { teacherCount: "1", weeklyClasses: "4" },
         part_time_regular: { teacherCount: "2", weeklyClasses: "8" },
       }),
+      weekdayRatioRows: buildDefaultWeekdayRatioRows(),
       slotRows: buildDefaultSlotRows(),
     },
     paid: {
@@ -331,6 +412,7 @@ function buildDefaultSimulatorForm() {
         part_time_rookie: { teacherCount: "0", weeklyClasses: "0" },
         part_time_regular: { teacherCount: "2", weeklyClasses: "6" },
       }),
+      weekdayRatioRows: buildDefaultWeekdayRatioRows(),
       slotRows: buildDefaultSlotRows([
         { dayOfWeek: "周二", startTime: "19:00", endTime: "20:00", ratio: "35.00" },
         { dayOfWeek: "周四", startTime: "19:00", endTime: "20:00", ratio: "35.00" },
@@ -368,7 +450,7 @@ function hydrateSimulatorForm(savedForm) {
   }
 
   return {
-    formVersion: 3,
+    formVersion: 4,
     period: {
       startDate: String(savedForm.period?.startDate ?? defaults.period.startDate).trim(),
       endDate: String(savedForm.period?.endDate ?? defaults.period.endDate).trim(),
@@ -387,6 +469,7 @@ function hydrateSimulatorForm(savedForm) {
       ).trim(),
       trainingDays: String(savedForm.trial?.trainingDays ?? defaults.trial.trainingDays).trim(),
       teacherRows: hydrateTeacherStageRows(savedForm.trial, defaults.trial.teacherRows),
+      weekdayRatioRows: hydrateWeekdayRatioRows(savedForm.trial, defaults.trial.weekdayRatioRows),
       slotRows: hydrateSlotRows(
         savedForm.trial?.slotRows,
         defaults.trial.slotRows,
@@ -418,6 +501,7 @@ function hydrateSimulatorForm(savedForm) {
       ).trim(),
       trainingDays: String(savedForm.paid?.trainingDays ?? defaults.paid.trainingDays).trim(),
       teacherRows: hydrateTeacherStageRows(savedForm.paid, defaults.paid.teacherRows),
+      weekdayRatioRows: hydrateWeekdayRatioRows(savedForm.paid, defaults.paid.weekdayRatioRows),
       slotRows: hydrateSlotRows(
         savedForm.paid?.slotRows,
         defaults.paid.slotRows,
@@ -516,11 +600,22 @@ function normalizeTeacherStageRows(body, prefix, fallbackRows) {
   return buildTeacherStageRows(rows.length > 0 ? rows : fallbackRows, fallbackRows);
 }
 
+function normalizeWeekdayRatioRows(body, prefix, fallbackRows) {
+  return buildWeekdayRatioRows(
+    WEEKDAY_FIELD_DEFINITIONS.map((definition) => ({
+      key: definition.key,
+      dayOfWeek: definition.value,
+      ratio: String(body[`${prefix}_weekday_ratio_${definition.key}`] ?? "").trim(),
+    })),
+    fallbackRows
+  );
+}
+
 function normalizeSimulatorInput(body = {}) {
   const defaults = buildDefaultSimulatorForm();
 
   return {
-    formVersion: 3,
+    formVersion: 4,
     period: {
       startDate: String(body.start_date ?? defaults.period.startDate).trim(),
       endDate: String(body.end_date ?? defaults.period.endDate).trim(),
@@ -535,6 +630,7 @@ function normalizeSimulatorInput(body = {}) {
       ).trim(),
       trainingDays: String(body.trial_training_days ?? defaults.trial.trainingDays).trim(),
       teacherRows: normalizeTeacherStageRows(body, "trial", defaults.trial.teacherRows),
+      weekdayRatioRows: normalizeWeekdayRatioRows(body, "trial", defaults.trial.weekdayRatioRows),
       slotRows: normalizeSlotRows(body, "trial"),
     },
     paid: {
@@ -558,6 +654,7 @@ function normalizeSimulatorInput(body = {}) {
       ).trim(),
       trainingDays: String(body.paid_training_days ?? defaults.paid.trainingDays).trim(),
       teacherRows: normalizeTeacherStageRows(body, "paid", defaults.paid.teacherRows),
+      weekdayRatioRows: normalizeWeekdayRatioRows(body, "paid", defaults.paid.weekdayRatioRows),
       slotRows: normalizeSlotRows(body, "paid"),
     },
   };
@@ -614,6 +711,75 @@ function parseRequiredPercent(value, label, options = {}) {
     percentValue: roundTo(numberResult.value, 2),
     value: numberResult.value / 100,
   };
+}
+
+function parseWeekdayPercent(value, label, options = {}) {
+  return parseRequiredPercent(value === "" ? "0" : value, label, options);
+}
+
+function validateWeekdayRatioRows(rows, label) {
+  if (!rows || rows.length === 0) {
+    return `${label} 每周班次占比至少需要配置 1 天。`;
+  }
+
+  let ratioSum = 0;
+
+  for (const row of rows) {
+    if (!normalizeWeekdayString(row.dayOfWeek)) {
+      return `${label} 的周内班次占比配置包含无效周几。`;
+    }
+
+    const ratioResult = parseWeekdayPercent(row.ratio, `${label}${row.dayOfWeek}班次占比`, {
+      min: 0,
+      max: PERCENTAGE_MAX,
+    });
+
+    if (!ratioResult.ok) {
+      return ratioResult.message;
+    }
+
+    ratioSum += ratioResult.percentValue;
+  }
+
+  if (ratioSum <= 0) {
+    return `${label} 每周班次占比合计必须大于 0%。`;
+  }
+
+  if (ratioSum > 100.01) {
+    return `${label} 每周班次占比合计不能超过 100%，当前为 ${formatFixed(ratioSum, 2)}%。`;
+  }
+
+  return "";
+}
+
+function buildWeekdayRatioMap(rows) {
+  const ratioMap = new Map(WEEKDAY_OPTIONS.map((option) => [option.value, 0]));
+
+  (rows || []).forEach((row) => {
+    const dayOfWeek = normalizeWeekdayString(row.dayOfWeek);
+    if (!dayOfWeek) {
+      return;
+    }
+
+    const parsed = parseWeekdayPercent(row.ratio, `${dayOfWeek}班次占比`);
+    ratioMap.set(dayOfWeek, parsed.ok ? parsed.value : 0);
+  });
+
+  return ratioMap;
+}
+
+function computeWeightedWeekUnits(startDate, endDate, weekdayRatioRows) {
+  const ratioMap = buildWeekdayRatioMap(weekdayRatioRows);
+  const cursor = toDate(startDate);
+  const end = toDate(endDate);
+  let total = 0;
+
+  while (cursor.getTime() <= end.getTime()) {
+    total += ratioMap.get(getWeekdayLabelByDate(cursor)) || 0;
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return roundTo(total, 4);
 }
 
 function validateSlotRows(rows, label) {
@@ -860,6 +1026,14 @@ function validateSimulatorForm(form, courseMode = "all") {
       return teacherError;
     }
 
+    const weekdayRatioError =
+      activeCourseMode === "trial"
+        ? validateWeekdayRatioRows(form.trial.weekdayRatioRows, "体验课")
+        : validateWeekdayRatioRows(form.paid.weekdayRatioRows, "正价课");
+    if (weekdayRatioError) {
+      return weekdayRatioError;
+    }
+
     const slotError =
       activeCourseMode === "trial"
         ? validateSlotRows(form.trial.slotRows, "体验课")
@@ -999,8 +1173,18 @@ function getCourseMeta(courseMode) {
 
 function calculateSimulatorResults(form) {
   const weekCount = computeWeekCount(form.period.startDate, form.period.endDate);
-  const weekUnits = computeWeekUnits(form.period.startDate, form.period.endDate);
+  const calendarWeekUnits = computeWeekUnits(form.period.startDate, form.period.endDate);
   const dayCount = diffDaysInclusive(form.period.startDate, form.period.endDate);
+  const trialWeekUnits = computeWeightedWeekUnits(
+    form.period.startDate,
+    form.period.endDate,
+    form.trial.weekdayRatioRows
+  );
+  const paidWeekUnits = computeWeightedWeekUnits(
+    form.period.startDate,
+    form.period.endDate,
+    form.paid.weekdayRatioRows
+  );
 
   const trialAssignedLeads = Number(form.trial.assignedLeads);
   const trialAttendRate = parseRequiredPercent(form.trial.attendRate, "体验课到课率").value;
@@ -1011,10 +1195,10 @@ function calculateSimulatorResults(form) {
 
   const trialArrivals = roundTo(trialAssignedLeads * trialAttendRate, 2);
   const trialRequiredClasses = trialArrivals > 0 ? Math.ceil(trialArrivals / trialClassSize) : 0;
-  const trialSupplyClasses = roundTo(trialTeacherSummary.weeklySupplyClasses * weekUnits, 2);
+  const trialSupplyClasses = roundTo(trialTeacherSummary.weeklySupplyClasses * trialWeekUnits, 2);
   const trialGapClasses = roundTo(trialSupplyClasses - trialRequiredClasses, 2);
   const trialWeeklyRequiredClasses =
-    trialRequiredClasses > 0 ? Math.ceil(trialRequiredClasses / weekUnits) : 0;
+    trialRequiredClasses > 0 && trialWeekUnits > 0 ? Math.ceil(trialRequiredClasses / trialWeekUnits) : 0;
   const trialSlotRatioSum = sumSlotRatios(form.trial.slotRows);
   const trialUtilization = safeDivide(trialRequiredClasses, trialSupplyClasses);
   const trialWarningLevel = getUtilizationWarningLevel(trialUtilization);
@@ -1044,12 +1228,12 @@ function calculateSimulatorResults(form) {
   );
   const paidRequiredClasses =
     paidProjectedStudents > 0
-      ? Math.ceil((paidProjectedStudents * paidStudentWeeklyClasses * weekUnits) / paidClassSize)
+      ? Math.ceil((paidProjectedStudents * paidStudentWeeklyClasses * paidWeekUnits) / paidClassSize)
       : 0;
-  const paidSupplyClasses = roundTo(paidTeacherSummary.weeklySupplyClasses * weekUnits, 2);
+  const paidSupplyClasses = roundTo(paidTeacherSummary.weeklySupplyClasses * paidWeekUnits, 2);
   const paidGapClasses = roundTo(paidSupplyClasses - paidRequiredClasses, 2);
   const paidWeeklyRequiredClasses =
-    paidRequiredClasses > 0 ? Math.ceil(paidRequiredClasses / weekUnits) : 0;
+    paidRequiredClasses > 0 && paidWeekUnits > 0 ? Math.ceil(paidRequiredClasses / paidWeekUnits) : 0;
   const paidSlotRatioSum = sumSlotRatios(form.paid.slotRows);
   const paidUtilization = safeDivide(paidRequiredClasses, paidSupplyClasses);
   const paidWarningLevel = getUtilizationWarningLevel(paidUtilization);
@@ -1089,17 +1273,18 @@ function calculateSimulatorResults(form) {
       endDate: form.period.endDate,
       rangeLabel: formatRangeLabel(form.period.startDate, form.period.endDate),
       weekCount,
-      weekUnits,
-      weekUnitsDisplay: formatFixed(weekUnits, 2),
+      calendarWeekUnits,
+      calendarWeekUnitsDisplay: formatFixed(calendarWeekUnits, 2),
       dayCount,
       summaryGranularity: form.period.summaryGranularity,
     },
     notes: [
-      `当前轻量版先按整体预测周期汇总输出，本次按 ${dayCount} 天折算为 ${formatFixed(weekUnits, 2)} 周进行试算。`,
+      `当前轻量版先按整体预测周期汇总输出，本次预测周期共 ${dayCount} 天，日历折算为 ${formatFixed(calendarWeekUnits, 2)} 周。`,
       "正价课预计承载人数按“当前在课底盘 - 续费流失人数 + 预测新增入课人数”计算，避免把待续费学员重复计入。",
       "热门时段按周均需求老师数试算，不直接拿整个预测周期总班次数与单周老师供给比较。",
       "未配置的剩余时段占比会视为普通时段，当前不单独展开预测。",
-      "整体供给当前只有“周课次”输入，因此尾周会按实际天数折算；尚未细化到周一到周日分别计算老师供给。",
+      "整体结果会按“周一到周日班次占比”折算有效周数；若某天未填写占比，默认视为 0%。",
+      "当前轻量版仍未单独录入老师在周一到周日的不同供给能力，因此整体供给先按班次占比近似拆分，不等同于真实排班能力。",
       "热门时段供给当前按“该课程类型所有老师均可参与该时段供给”进行快速试算，这不是实际排班能力。",
     ],
     trial: {
@@ -1120,8 +1305,11 @@ function calculateSimulatorResults(form) {
       recruitmentDays: trialRecruitmentDays,
       trainingDays: trialTrainingDays,
       teacherRows: form.trial.teacherRows,
+      weekdayRatioRows: form.trial.weekdayRatioRows,
       totalTeachers: trialTeacherSummary.totalTeachers,
       weeklySupplyClasses: trialTeacherSummary.weeklySupplyClasses,
+      weekUnits: trialWeekUnits,
+      weekUnitsDisplay: formatFixed(trialWeekUnits, 2),
       recruitLeadDays: trialLeadDays,
       latestRecruitStartDate: trialRecruitStartDate,
       staffingSuggestion: trialStaffingSuggestion,
@@ -1158,8 +1346,11 @@ function calculateSimulatorResults(form) {
       recruitmentDays: paidRecruitmentDays,
       trainingDays: paidTrainingDays,
       teacherRows: form.paid.teacherRows,
+      weekdayRatioRows: form.paid.weekdayRatioRows,
       totalTeachers: paidTeacherSummary.totalTeachers,
       weeklySupplyClasses: paidTeacherSummary.weeklySupplyClasses,
+      weekUnits: paidWeekUnits,
+      weekUnitsDisplay: formatFixed(paidWeekUnits, 2),
       recruitLeadDays: paidLeadDays,
       latestRecruitStartDate: paidRecruitStartDate,
       staffingSuggestion: paidStaffingSuggestion,

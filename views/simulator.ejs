@@ -27,6 +27,16 @@
       remainingDisplay: formatPercentDisplay(Math.max(0, 100 - ratioSum)),
     };
   }
+
+  function summarizeWeekdayRatioRows(rows) {
+    const ratioSum = rows.reduce((sum, row) => sum + parsePercentDisplay(row.ratio), 0);
+
+    return {
+      ratioSum,
+      ratioSumDisplay: formatPercentDisplay(ratioSum),
+      remainingDisplay: formatPercentDisplay(Math.max(0, 100 - ratioSum)),
+    };
+  }
 %>
 
 <% if (result) { %>
@@ -40,7 +50,7 @@
     </div>
     <div class="note-list compact-note-list recent-result-tags">
       <span class="tag">周期：<%= result.cycleSummary.rangeLabel %></span>
-      <span class="tag">折算周数：<%= result.cycleSummary.weekUnitsDisplay %> 周</span>
+      <span class="tag">折算周数：<%= result[courseMode].weekUnitsDisplay %> 周</span>
       <span class="tag">当前课程：<%= courseMeta.label %></span>
     </div>
     <p class="field-help">页面已按当前已保存配置自动展示最近一次预测结果。点击右侧“重新预测”即可展开设置并重新试算。</p>
@@ -108,6 +118,7 @@
 
       <% if (courseMode === "trial") { %>
         <% const trialSlotSummary = summarizeSlotRows(simulatorForm.trial.slotRows); %>
+        <% const trialWeekdayRatioSummary = summarizeWeekdayRatioRows(simulatorForm.trial.weekdayRatioRows); %>
         <section class="simulator-block">
           <div class="section-heading compact-section-heading">
             <p class="eyebrow">区域 B</p>
@@ -137,6 +148,50 @@
               <span>老师入职培训周期（天）</span>
               <input name="trial_training_days" type="number" min="0" step="1" value="<%= simulatorForm.trial.trainingDays %>" required />
             </label>
+          </div>
+
+          <div class="teacher-stage-card">
+            <div class="card-header-row">
+              <div class="section-heading compact-section-heading section-heading-compact">
+                <p class="eyebrow">周内拆分</p>
+                <h3>体验课每周班次占比</h3>
+              </div>
+              <div class="card-tools">
+                <details class="inline-disclosure tool-disclosure">
+                  <summary>查看字段说明</summary>
+                  <div class="disclosure-body">
+                    <p class="field-help">用于把一整周的班次拆到周一到周日，帮助系统更准确判断尾周剩余天数对应的有效供给和需求。</p>
+                    <p class="field-help">未填写的日期默认按 0% 处理；合计建议接近 100%，若低于 100%，未分配部分会视为未覆盖班次。</p>
+                  </div>
+                </details>
+              </div>
+            </div>
+            <div class="note-list compact-note-list" data-weekday-ratio-summary="trial">
+              <span class="tag" data-weekday-ratio-sum>已配置占比 <%= trialWeekdayRatioSummary.ratioSumDisplay %></span>
+              <span class="tag" data-weekday-ratio-remaining>未分配 <%= trialWeekdayRatioSummary.remainingDisplay %></span>
+            </div>
+            <details class="inline-disclosure compact-inline-disclosure">
+              <summary>批量粘贴周内占比</summary>
+              <div class="disclosure-body">
+                <p class="field-help">支持直接粘贴“周几 + 占比”两列，例如：<strong>周二 5.50%</strong>、<strong>周六 22.73%</strong>；`总计` 行会自动忽略。</p>
+                <textarea class="slot-bulk-input" rows="4" data-weekday-ratio-bulk-input="trial" placeholder="周二\t5.50%&#10;周六\t22.73%&#10;周日\t24.05%&#10;总计\t99.95%"></textarea>
+                <div class="action-row slot-bulk-actions">
+                  <button type="button" class="secondary-link" data-import-weekday-ratios="trial">应用到周一到周日</button>
+                  <span class="field-help">只覆盖已识别到的周几，未出现的日期保留当前值。</span>
+                </div>
+              </div>
+            </details>
+            <div class="simulator-grid simulator-grid-4">
+              <% simulatorForm.trial.weekdayRatioRows.forEach((row) => { %>
+                <label>
+                  <span><%= row.label %></span>
+                  <div class="input-with-suffix">
+                    <input name="trial_weekday_ratio_<%= row.key %>" type="text" inputmode="decimal" value="<%= row.ratio %>" data-percent-input data-weekday-ratio-input="trial" data-weekday-ratio-key="<%= row.key %>" />
+                    <span>%</span>
+                  </div>
+                </label>
+              <% }) %>
+            </div>
           </div>
 
           <div class="teacher-stage-card">
@@ -268,6 +323,7 @@
         </section>
       <% } else { %>
         <% const paidSlotSummary = summarizeSlotRows(simulatorForm.paid.slotRows); %>
+        <% const paidWeekdayRatioSummary = summarizeWeekdayRatioRows(simulatorForm.paid.weekdayRatioRows); %>
         <section class="simulator-block">
           <div class="card-header-row">
             <div class="section-heading compact-section-heading section-heading-compact">
@@ -324,6 +380,50 @@
               <input name="paid_training_days" type="number" min="0" step="1" value="<%= simulatorForm.paid.trainingDays %>" required />
             </label>
           </div>
+          <div class="teacher-stage-card">
+            <div class="card-header-row">
+              <div class="section-heading compact-section-heading section-heading-compact">
+                <p class="eyebrow">周内拆分</p>
+                <h3>正价课每周班次占比</h3>
+              </div>
+              <div class="card-tools">
+                <details class="inline-disclosure tool-disclosure">
+                  <summary>查看字段说明</summary>
+                  <div class="disclosure-body">
+                    <p class="field-help">用于把一整周的班次拆到周一到周日，帮助系统更准确判断尾周剩余天数对应的有效供给和需求。</p>
+                    <p class="field-help">未填写的日期默认按 0% 处理；合计建议接近 100%，若低于 100%，未分配部分会视为未覆盖班次。</p>
+                  </div>
+                </details>
+              </div>
+            </div>
+            <div class="note-list compact-note-list" data-weekday-ratio-summary="paid">
+              <span class="tag" data-weekday-ratio-sum>已配置占比 <%= paidWeekdayRatioSummary.ratioSumDisplay %></span>
+              <span class="tag" data-weekday-ratio-remaining>未分配 <%= paidWeekdayRatioSummary.remainingDisplay %></span>
+            </div>
+            <details class="inline-disclosure compact-inline-disclosure">
+              <summary>批量粘贴周内占比</summary>
+              <div class="disclosure-body">
+                <p class="field-help">支持直接粘贴“周几 + 占比”两列，例如：<strong>周二 5.50%</strong>、<strong>周六 22.73%</strong>；`总计` 行会自动忽略。</p>
+                <textarea class="slot-bulk-input" rows="4" data-weekday-ratio-bulk-input="paid" placeholder="周二\t5.50%&#10;周六\t22.73%&#10;周日\t24.05%&#10;总计\t99.95%"></textarea>
+                <div class="action-row slot-bulk-actions">
+                  <button type="button" class="secondary-link" data-import-weekday-ratios="paid">应用到周一到周日</button>
+                  <span class="field-help">只覆盖已识别到的周几，未出现的日期保留当前值。</span>
+                </div>
+              </div>
+            </details>
+            <div class="simulator-grid simulator-grid-4">
+              <% simulatorForm.paid.weekdayRatioRows.forEach((row) => { %>
+                <label>
+                  <span><%= row.label %></span>
+                  <div class="input-with-suffix">
+                    <input name="paid_weekday_ratio_<%= row.key %>" type="text" inputmode="decimal" value="<%= row.ratio %>" data-percent-input data-weekday-ratio-input="paid" data-weekday-ratio-key="<%= row.key %>" />
+                    <span>%</span>
+                  </div>
+                </label>
+              <% }) %>
+            </div>
+          </div>
+
           <div class="teacher-stage-card">
             <div class="card-header-row">
               <div class="section-heading compact-section-heading section-heading-compact">
@@ -528,9 +628,9 @@
             <details class="inline-disclosure tool-disclosure">
               <summary>查看字段说明</summary>
               <div class="disclosure-body">
-                <p class="field-help">需求班次数：按“预计到课人数 ÷ 每班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再按预测周期天数折算周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
+                <p class="field-help">需求班次数：按“预计到课人数 ÷ 每班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再结合“周一到周日班次占比”折算有效周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
                 <p class="field-help">当前已展开的热门时段占比为 <strong><%= result.trial.slotRatioSumDisplay %></strong>，其余 <strong><%= result.trial.remainingOrdinaryRatioDisplay %></strong> 视为普通时段，当前不单独展开预测。</p>
-                <p class="field-help">当前轻量版整体供给只录入“周课次”，还没有细分到周一到周日，因此尾周会按天数比例折算，不会再把不足 7 天的周期当整周计算。</p>
+                <p class="field-help">当前轻量版整体供给仍只录入“周课次”，还没有单独录入老师在周一到周日的不同供给能力，因此系统先按班次占比近似拆分尾周影响。</p>
                 <p class="field-help">招聘提前量按“缺口开始时间 -（招聘周期 + 培训周期）”反推。当前轻量版把预测周期开始日作为缺口开始时间，用于判断最晚启动招聘的时间点。</p>
               </div>
             </details>
@@ -539,9 +639,9 @@
               <summary>查看字段说明</summary>
               <div class="disclosure-body">
                 <p class="field-help">预计正价承载人数 = 当前在课底盘 - 续费流失人数 + 预测新增入课人数。本页默认“当前总在课人数”已经包含本期待续费人数。</p>
-                <p class="field-help">需求班次数：按“预计承载学员数 × 每生周课次 × 预测周期折算周数 ÷ 班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再按预测周期天数折算周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
+                <p class="field-help">需求班次数：按“预计承载学员数 × 每生周课次 × 预测周期有效周数 ÷ 班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再结合“周一到周日班次占比”折算有效周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
                 <p class="field-help">当前已展开的热门时段占比为 <strong><%= result.paid.slotRatioSumDisplay %></strong>，其余 <strong><%= result.paid.remainingOrdinaryRatioDisplay %></strong> 视为普通时段，当前不单独展开预测。</p>
-                <p class="field-help">当前轻量版整体供给只录入“周课次”，还没有细分到周一到周日，因此尾周会按天数比例折算，不会再把不足 7 天的周期当整周计算。</p>
+                <p class="field-help">当前轻量版整体供给仍只录入“周课次”，还没有单独录入老师在周一到周日的不同供给能力，因此系统先按班次占比近似拆分尾周影响。</p>
                 <p class="field-help">招聘提前量按“缺口开始时间 -（招聘周期 + 培训周期）”反推。当前轻量版把预测周期开始日作为缺口开始时间，用于判断最晚启动招聘的时间点。</p>
               </div>
             </details>
@@ -652,7 +752,7 @@
     <div class="disclosure-body">
       <div class="note-list">
         <span class="tag">周期：<%= result.cycleSummary.rangeLabel %></span>
-        <span class="tag">折算周数：<%= result.cycleSummary.weekUnitsDisplay %> 周</span>
+        <span class="tag">折算周数：<%= result[courseMode].weekUnitsDisplay %> 周</span>
         <span class="tag">汇总维度：<%= summaryGranularityOptions.find((option) => option.value === result.cycleSummary.summaryGranularity)?.label || result.cycleSummary.summaryGranularity %></span>
       </div>
       <div class="module-list">
@@ -886,6 +986,16 @@
       );
     }
 
+    function getWeekdayRatioInputs(group) {
+      return Array.from(document.querySelectorAll(`[data-weekday-ratio-input="${group}"]`));
+    }
+
+    function getWeekdayRatioInputMap(group) {
+      return new Map(
+        getWeekdayRatioInputs(group).map((input) => [input.dataset.weekdayRatioKey, input])
+      );
+    }
+
     function updateSlotEmptyState(group) {
       const emptyState = document.querySelector(`[data-slot-empty-state="${group}"]`);
       const container = document.querySelector(`.slot-rows[data-slot-group="${group}"]`);
@@ -931,6 +1041,10 @@
       getRatioInputs(group).forEach((input) => input.setCustomValidity(""));
     }
 
+    function clearWeekdayRatioValidity(group) {
+      getWeekdayRatioInputs(group).forEach((input) => input.setCustomValidity(""));
+    }
+
     function validateRatioGroup(group, label) {
       const inputs = getRatioInputs(group);
       const ratioSum = inputs.reduce((sum, input) => {
@@ -948,6 +1062,128 @@
       }
 
       return true;
+    }
+
+    function updateWeekdayRatioSummary(group) {
+      const summary = document.querySelector(`[data-weekday-ratio-summary="${group}"]`);
+
+      if (!summary) {
+        return;
+      }
+
+      const inputs = getWeekdayRatioInputs(group);
+      const ratioSum = inputs.reduce((sum, input) => {
+        const value = parsePercentValue(input.value);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+
+      const sumEl = summary.querySelector("[data-weekday-ratio-sum]");
+      const remainingEl = summary.querySelector("[data-weekday-ratio-remaining]");
+
+      if (sumEl) {
+        sumEl.textContent = `已配置占比 ${ratioSum.toFixed(2)}%`;
+      }
+
+      if (remainingEl) {
+        remainingEl.textContent = `未分配 ${Math.max(0, 100 - ratioSum).toFixed(2)}%`;
+      }
+    }
+
+    function validateWeekdayRatioGroup(group, label) {
+      const inputs = getWeekdayRatioInputs(group);
+      const ratioSum = inputs.reduce((sum, input) => {
+        const value = parsePercentValue(input.value);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+
+      clearWeekdayRatioValidity(group);
+
+      if (ratioSum <= 0 && inputs[0]) {
+        const message = `${label}每周班次占比合计必须大于 0%。`;
+        inputs[0].setCustomValidity(message);
+        inputs[0].reportValidity();
+        return false;
+      }
+
+      if (ratioSum > 100.01 && inputs[0]) {
+        const message = `${label}每周班次占比合计不能超过 100%，当前为 ${ratioSum.toFixed(2)}%。`;
+        inputs[0].setCustomValidity(message);
+        inputs[0].reportValidity();
+        return false;
+      }
+
+      return true;
+    }
+
+    function parseWeekdayRatioBulkLine(line) {
+      const normalizedLine = line.trim();
+
+      if (!normalizedLine) {
+        return null;
+      }
+
+      const compactLine = normalizedLine.replace(/\s+/g, "");
+      if (compactLine.startsWith("总计")) {
+        return { skip: true };
+      }
+
+      const tabParts = normalizedLine.split("\t").map((part) => part.trim()).filter(Boolean);
+      if (tabParts.length >= 2) {
+        const dayOfWeek = normalizeWeekdayValue(tabParts[0]);
+        if (!dayOfWeek) {
+          return null;
+        }
+
+        return { dayOfWeek, ratio: tabParts[1] };
+      }
+
+      const commaParts = normalizedLine.split(/[，,]/).map((part) => part.trim()).filter(Boolean);
+      if (commaParts.length >= 2) {
+        const dayOfWeek = normalizeWeekdayValue(commaParts[0]);
+        if (!dayOfWeek) {
+          return null;
+        }
+
+        return { dayOfWeek, ratio: commaParts[1] };
+      }
+
+      const match = normalizedLine.match(/^((?:周|星期)(?:[一二三四五六日天]|\d))\s+([0-9]+(?:\.[0-9]+)?%?)$/);
+      if (!match) {
+        return null;
+      }
+
+      const dayOfWeek = normalizeWeekdayValue(match[1]);
+      if (!dayOfWeek) {
+        return null;
+      }
+
+      return { dayOfWeek, ratio: match[2] };
+    }
+
+    function applyWeekdayRatioRows(group, rows) {
+      const keyByWeekday = {
+        周一: "monday",
+        周二: "tuesday",
+        周三: "wednesday",
+        周四: "thursday",
+        周五: "friday",
+        周六: "saturday",
+        周日: "sunday",
+      };
+      const inputMap = getWeekdayRatioInputMap(group);
+
+      rows.forEach((row) => {
+        const input = inputMap.get(keyByWeekday[row.dayOfWeek]);
+        if (!input) {
+          return;
+        }
+
+        input.value = row.ratio;
+        formatPercentInput(input);
+      });
+
+      clearWeekdayRatioValidity(group);
+      updateWeekdayRatioSummary(group);
     }
 
     function bindSlotNames(container, prefix) {
@@ -1121,6 +1357,48 @@
       });
     });
 
+    document.querySelectorAll("[data-import-weekday-ratios]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const group = button.dataset.importWeekdayRatios;
+        const textarea = document.querySelector(`[data-weekday-ratio-bulk-input="${group}"]`);
+
+        if (!textarea) {
+          return;
+        }
+
+        const lines = textarea.value.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+        if (lines.length === 0) {
+          return;
+        }
+
+        const parsedRows = [];
+        const invalidLines = [];
+
+        lines.forEach((line, index) => {
+          const row = parseWeekdayRatioBulkLine(line);
+
+          if (!row) {
+            invalidLines.push(index + 1);
+            return;
+          }
+
+          if (row.skip) {
+            return;
+          }
+
+          parsedRows.push(row);
+        });
+
+        if (invalidLines.length > 0) {
+          window.alert(`以下行格式无法识别，请检查后重试：第 ${invalidLines.join("、")} 行。`);
+          return;
+        }
+
+        applyWeekdayRatioRows(group, parsedRows);
+        textarea.value = "";
+      });
+    });
+
     document.addEventListener("click", (event) => {
       const staticSummaryTag = event.target.closest(".slot-summary-tag");
 
@@ -1163,6 +1441,16 @@
         clearRatioValidity("paid");
         updateSlotSummary("paid");
       }
+
+      if (event.target.matches('[data-weekday-ratio-input="trial"]')) {
+        clearWeekdayRatioValidity("trial");
+        updateWeekdayRatioSummary("trial");
+      }
+
+      if (event.target.matches('[data-weekday-ratio-input="paid"]')) {
+        clearWeekdayRatioValidity("paid");
+        updateWeekdayRatioSummary("paid");
+      }
     });
 
     document.addEventListener("blur", (event) => {
@@ -1179,7 +1467,18 @@
       if (event.target.matches('input[name="paid_slot_ratio[]"]')) {
         updateSlotSummary("paid");
       }
+
+      if (event.target.matches('[data-weekday-ratio-input="trial"]')) {
+        updateWeekdayRatioSummary("trial");
+      }
+
+      if (event.target.matches('[data-weekday-ratio-input="paid"]')) {
+        updateWeekdayRatioSummary("paid");
+      }
     }, true);
+
+    updateWeekdayRatioSummary("trial");
+    updateWeekdayRatioSummary("paid");
 
     if (form) {
       form.addEventListener("submit", (event) => {
@@ -1189,8 +1488,9 @@
 
         const activeGroupLabel = activeCourseMode === "paid" ? "正价课" : "体验课";
         const activeGroupOk = validateRatioGroup(activeCourseMode, activeGroupLabel);
+        const activeWeekdayGroupOk = validateWeekdayRatioGroup(activeCourseMode, activeGroupLabel);
 
-        if (!activeGroupOk) {
+        if (!activeGroupOk || !activeWeekdayGroupOk) {
           event.preventDefault();
         }
       });
