@@ -1147,6 +1147,23 @@ body.predictor-shell .card-header-row {
   margin-bottom: 16px;
 }
 
+body.predictor-shell .weekday-ratio-summary-inline {
+  margin-top: 0;
+  margin-left: auto;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+body.predictor-shell .weekday-ratio-summary-inline .tag {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(220, 235, 229, 0.52);
+  color: #5f756e;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 body.predictor-shell .field-help,
 body.predictor-shell .formula-note,
 body.predictor-shell .result-note,
@@ -1186,6 +1203,11 @@ body.predictor-shell .data-table td {
   }
 
   .card-tools {
+    justify-content: flex-start;
+  }
+
+  body.predictor-shell .weekday-ratio-summary-inline {
+    width: 100%;
     justify-content: flex-start;
   }
 

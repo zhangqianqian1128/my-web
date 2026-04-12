@@ -156,6 +156,10 @@
                 <p class="eyebrow">周内拆分</p>
                 <h3>体验课每周班次占比</h3>
               </div>
+              <div class="note-list compact-note-list weekday-ratio-summary-inline" data-weekday-ratio-summary="trial">
+                <span class="tag" data-weekday-ratio-sum>已配置占比 <%= trialWeekdayRatioSummary.ratioSumDisplay %></span>
+                <span class="tag" data-weekday-ratio-remaining>未分配 <%= trialWeekdayRatioSummary.remainingDisplay %></span>
+              </div>
               <div class="card-tools">
                 <details class="inline-disclosure tool-disclosure">
                   <summary>查看字段说明</summary>
@@ -165,10 +169,6 @@
                   </div>
                 </details>
               </div>
-            </div>
-            <div class="note-list compact-note-list" data-weekday-ratio-summary="trial">
-              <span class="tag" data-weekday-ratio-sum>已配置占比 <%= trialWeekdayRatioSummary.ratioSumDisplay %></span>
-              <span class="tag" data-weekday-ratio-remaining>未分配 <%= trialWeekdayRatioSummary.remainingDisplay %></span>
             </div>
             <details class="inline-disclosure compact-inline-disclosure">
               <summary>批量粘贴周内占比</summary>
@@ -386,6 +386,10 @@
                 <p class="eyebrow">周内拆分</p>
                 <h3>正价课每周班次占比</h3>
               </div>
+              <div class="note-list compact-note-list weekday-ratio-summary-inline" data-weekday-ratio-summary="paid">
+                <span class="tag" data-weekday-ratio-sum>已配置占比 <%= paidWeekdayRatioSummary.ratioSumDisplay %></span>
+                <span class="tag" data-weekday-ratio-remaining>未分配 <%= paidWeekdayRatioSummary.remainingDisplay %></span>
+              </div>
               <div class="card-tools">
                 <details class="inline-disclosure tool-disclosure">
                   <summary>查看字段说明</summary>
@@ -395,10 +399,6 @@
                   </div>
                 </details>
               </div>
-            </div>
-            <div class="note-list compact-note-list" data-weekday-ratio-summary="paid">
-              <span class="tag" data-weekday-ratio-sum>已配置占比 <%= paidWeekdayRatioSummary.ratioSumDisplay %></span>
-              <span class="tag" data-weekday-ratio-remaining>未分配 <%= paidWeekdayRatioSummary.remainingDisplay %></span>
             </div>
             <details class="inline-disclosure compact-inline-disclosure">
               <summary>批量粘贴周内占比</summary>
