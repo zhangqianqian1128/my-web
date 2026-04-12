@@ -207,8 +207,8 @@
                 <details class="inline-disclosure compact-inline-disclosure">
                   <summary>批量粘贴添加时段</summary>
                   <div class="disclosure-body">
-                    <p class="field-help">支持每行一条，例如：<strong>周三 18:00-19:00 12.50%</strong>；也支持从 Excel 直接粘贴“周几 / 开始时间 / 结束时间 / 占比”四列。</p>
-                    <textarea class="slot-bulk-input" rows="4" data-slot-bulk-input="trial" placeholder="周三 18:00-19:00 12.50%&#10;周六\t10:00\t11:00\t8.00"></textarea>
+                    <p class="field-help">支持每行一条，例如：<strong>周三 18:00-19:00 12.50%</strong>、<strong>周四 20:00:00 – 21:00:00 4.09%</strong>；也支持从 Excel 直接粘贴“周几 / 开始时间 / 结束时间 / 占比”四列。</p>
+                    <textarea class="slot-bulk-input" rows="4" data-slot-bulk-input="trial" placeholder="周三 18:00-19:00 12.50%&#10;周四 20:00:00 – 21:00:00 4.09%&#10;周六\t10:00:00\t11:00:00\t8.00"></textarea>
                     <div class="action-row slot-bulk-actions">
                       <button type="button" class="secondary-link" data-import-slots="trial">追加到时段列表</button>
                       <span class="field-help">不会覆盖已存在配置。</span>
@@ -246,8 +246,10 @@
                     </div>
                   <% }) %>
                 </div>
+                <p class="field-help slot-empty-state" data-slot-empty-state="trial" <%= simulatorForm.trial.slotRows.length > 0 ? "hidden" : "" %>>当前还没有配置时段，可以批量粘贴，或点击下方按钮重新录入。</p>
 
                 <div class="action-row">
+                  <button type="button" class="secondary-link" data-clear-slots="trial">清空体验课时段</button>
                   <button type="button" class="secondary-link add-slot-button" data-add-slot="trial">新增体验课时段</button>
                 </div>
                 <div class="card-tools card-tools-inline">
@@ -390,8 +392,8 @@
                 <details class="inline-disclosure compact-inline-disclosure">
                   <summary>批量粘贴添加时段</summary>
                   <div class="disclosure-body">
-                    <p class="field-help">支持每行一条，例如：<strong>周四 19:00-20:00 10.00%</strong>；也支持从 Excel 直接粘贴“周几 / 开始时间 / 结束时间 / 占比”四列。</p>
-                    <textarea class="slot-bulk-input" rows="4" data-slot-bulk-input="paid" placeholder="周二 19:00-20:00 12.50%&#10;周六\t09:00\t10:00\t8.00"></textarea>
+                    <p class="field-help">支持每行一条，例如：<strong>周四 19:00-20:00 10.00%</strong>、<strong>周四 20:00:00 – 21:00:00 4.09%</strong>；也支持从 Excel 直接粘贴“周几 / 开始时间 / 结束时间 / 占比”四列。</p>
+                    <textarea class="slot-bulk-input" rows="4" data-slot-bulk-input="paid" placeholder="周二 19:00-20:00 12.50%&#10;周四 20:00:00 – 21:00:00 4.09%&#10;周六\t09:00:00\t10:00:00\t8.00"></textarea>
                     <div class="action-row slot-bulk-actions">
                       <button type="button" class="secondary-link" data-import-slots="paid">追加到时段列表</button>
                       <span class="field-help">不会覆盖已存在配置。</span>
@@ -429,8 +431,10 @@
                     </div>
                   <% }) %>
                 </div>
+                <p class="field-help slot-empty-state" data-slot-empty-state="paid" <%= simulatorForm.paid.slotRows.length > 0 ? "hidden" : "" %>>当前还没有配置时段，可以批量粘贴，或点击下方按钮重新录入。</p>
 
                 <div class="action-row">
+                  <button type="button" class="secondary-link" data-clear-slots="paid">清空正价课时段</button>
                   <button type="button" class="secondary-link add-slot-button" data-add-slot="paid">新增正价课时段</button>
                 </div>
                 <div class="card-tools card-tools-inline">
@@ -785,6 +789,75 @@
       return Number.isFinite(parsed) ? parsed : NaN;
     }
 
+    function normalizeTimeValue(rawValue) {
+      const normalizedValue = String(rawValue ?? "").trim();
+      const match = normalizedValue.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
+
+      if (!match) {
+        return "";
+      }
+
+      const hours = Number(match[1]);
+      const minutes = Number(match[2]);
+      const seconds = match[3] === undefined ? 0 : Number(match[3]);
+
+      if (
+        !Number.isInteger(hours) ||
+        !Number.isInteger(minutes) ||
+        !Number.isInteger(seconds) ||
+        hours < 0 ||
+        hours > 23 ||
+        minutes < 0 ||
+        minutes > 59 ||
+        seconds < 0 ||
+        seconds > 59
+      ) {
+        return "";
+      }
+
+      return `${match[1]}:${match[2]}`;
+    }
+
+    function normalizeWeekdayValue(rawValue) {
+      const normalizedValue = String(rawValue ?? "").trim();
+      const weekdayMap = {
+        周一: "周一",
+        星期一: "周一",
+        周1: "周一",
+        星期1: "周一",
+        周二: "周二",
+        星期二: "周二",
+        周2: "周二",
+        星期2: "周二",
+        周三: "周三",
+        星期三: "周三",
+        周3: "周三",
+        星期3: "周三",
+        周四: "周四",
+        星期四: "周四",
+        周4: "周四",
+        星期4: "周四",
+        周五: "周五",
+        星期五: "周五",
+        周5: "周五",
+        星期5: "周五",
+        周六: "周六",
+        星期六: "周六",
+        周6: "周六",
+        星期6: "周六",
+        周日: "周日",
+        周天: "周日",
+        星期日: "周日",
+        星期天: "周日",
+        周7: "周日",
+        星期7: "周日",
+        周0: "周日",
+        星期0: "周日",
+      };
+
+      return weekdayMap[normalizedValue] || "";
+    }
+
     function formatPercentInput(input) {
       if (!input) {
         return;
@@ -801,6 +874,17 @@
       return Array.from(
         document.querySelectorAll(`.slot-rows[data-slot-group="${group}"] input[name="${group}_slot_ratio[]"]`)
       );
+    }
+
+    function updateSlotEmptyState(group) {
+      const emptyState = document.querySelector(`[data-slot-empty-state="${group}"]`);
+      const container = document.querySelector(`.slot-rows[data-slot-group="${group}"]`);
+
+      if (!emptyState || !container) {
+        return;
+      }
+
+      emptyState.hidden = container.querySelectorAll(".slot-row").length > 0;
     }
 
     function updateSlotSummary(group) {
@@ -865,6 +949,7 @@
       });
 
       updateSlotSummary(prefix);
+      updateSlotEmptyState(prefix);
     }
 
     function appendSlotRow(group, rowData = {}) {
@@ -900,34 +985,60 @@
 
       const tabParts = normalizedLine.split("\t").map((part) => part.trim()).filter(Boolean);
       if (tabParts.length >= 4) {
+        const dayOfWeek = normalizeWeekdayValue(tabParts[0]);
+        const startTime = normalizeTimeValue(tabParts[1]);
+        const endTime = normalizeTimeValue(tabParts[2]);
+
+        if (!dayOfWeek || !startTime || !endTime) {
+          return null;
+        }
+
         return {
-          dayOfWeek: tabParts[0],
-          startTime: tabParts[1],
-          endTime: tabParts[2],
+          dayOfWeek,
+          startTime,
+          endTime,
           ratio: tabParts[3],
         };
       }
 
       const commaParts = normalizedLine.split(/[，,]/).map((part) => part.trim()).filter(Boolean);
       if (commaParts.length >= 4) {
+        const dayOfWeek = normalizeWeekdayValue(commaParts[0]);
+        const startTime = normalizeTimeValue(commaParts[1]);
+        const endTime = normalizeTimeValue(commaParts[2]);
+
+        if (!dayOfWeek || !startTime || !endTime) {
+          return null;
+        }
+
         return {
-          dayOfWeek: commaParts[0],
-          startTime: commaParts[1],
-          endTime: commaParts[2],
+          dayOfWeek,
+          startTime,
+          endTime,
           ratio: commaParts[3],
         };
       }
 
-      const match = normalizedLine.match(/^(周[一二三四五六日])\s+(\d{2}:\d{2})\s*[-~—至]+\s*(\d{2}:\d{2})\s+([0-9]+(?:\.[0-9]+)?%?)$/);
+      const match = normalizedLine.match(
+        /^((?:周|星期)(?:[一二三四五六日天]|\d))\s+(\d{2}:\d{2}(?::\d{2})?)\s*[-~—–－至到]+\s*(\d{2}:\d{2}(?::\d{2})?)\s+([0-9]+(?:\.[0-9]+)?%?)$/
+      );
 
       if (!match) {
         return null;
       }
 
+      const dayOfWeek = normalizeWeekdayValue(match[1]);
+      const startTime = normalizeTimeValue(match[2]);
+      const endTime = normalizeTimeValue(match[3]);
+
+      if (!dayOfWeek || !startTime || !endTime) {
+        return null;
+      }
+
       return {
-        dayOfWeek: match[1],
-        startTime: match[2],
-        endTime: match[3],
+        dayOfWeek,
+        startTime,
+        endTime,
         ratio: match[4],
       };
     }
@@ -943,6 +1054,21 @@
     document.querySelectorAll("[data-add-slot]").forEach((button) => {
       button.addEventListener("click", () => {
         appendSlotRow(button.dataset.addSlot);
+      });
+    });
+
+    document.querySelectorAll("[data-clear-slots]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const group = button.dataset.clearSlots;
+        const container = document.querySelector(`.slot-rows[data-slot-group="${group}"]`);
+
+        if (!container) {
+          return;
+        }
+
+        container.innerHTML = "";
+        bindSlotNames(container, group);
+        clearRatioValidity(group);
       });
     });
 
@@ -1003,7 +1129,7 @@
       const row = button.closest(".slot-row");
       const container = row.closest(".slot-rows");
 
-      if (!container || container.querySelectorAll(".slot-row").length <= 1) {
+      if (!container) {
         return;
       }
 

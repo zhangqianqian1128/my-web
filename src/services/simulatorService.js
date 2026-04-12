@@ -137,6 +137,75 @@ function buildDefaultSlotRows(rows) {
   ];
 }
 
+function normalizeTimeString(value) {
+  const normalizedValue = String(value ?? "").trim();
+  const match = normalizedValue.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/);
+
+  if (!match) {
+    return "";
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = match[3] === undefined ? 0 : Number(match[3]);
+
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    !Number.isInteger(seconds) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59 ||
+    seconds < 0 ||
+    seconds > 59
+  ) {
+    return "";
+  }
+
+  return `${match[1]}:${match[2]}`;
+}
+
+function normalizeWeekdayString(value) {
+  const normalizedValue = String(value ?? "").trim();
+  const weekdayMap = {
+    周一: "周一",
+    星期一: "周一",
+    周1: "周一",
+    星期1: "周一",
+    周二: "周二",
+    星期二: "周二",
+    周2: "周二",
+    星期2: "周二",
+    周三: "周三",
+    星期三: "周三",
+    周3: "周三",
+    星期3: "周三",
+    周四: "周四",
+    星期四: "周四",
+    周4: "周四",
+    星期4: "周四",
+    周五: "周五",
+    星期五: "周五",
+    周5: "周五",
+    星期5: "周五",
+    周六: "周六",
+    星期六: "周六",
+    周6: "周六",
+    星期6: "周六",
+    周日: "周日",
+    周天: "周日",
+    星期日: "周日",
+    星期天: "周日",
+    周7: "周日",
+    星期7: "周日",
+    周0: "周日",
+    星期0: "周日",
+  };
+
+  return weekdayMap[normalizedValue] || "";
+}
+
 function buildTeacherStageKey(typeKey, stageKey) {
   return `${String(typeKey || "").trim()}_${String(stageKey || "").trim()}`;
 }
@@ -268,18 +337,22 @@ function buildDefaultSimulatorForm() {
 }
 
 function hydrateSlotRows(rows, fallbackRows, upgradeLegacyFraction = false) {
-  const sourceRows = Array.isArray(rows) && rows.length > 0 ? rows : fallbackRows;
+  const sourceRows = Array.isArray(rows) ? rows : fallbackRows;
 
-  return buildDefaultSlotRows(
-    sourceRows.map((row, index) => ({
-      dayOfWeek: String(row?.dayOfWeek ?? fallbackRows[index]?.dayOfWeek ?? "").trim(),
-      startTime: String(row?.startTime ?? fallbackRows[index]?.startTime ?? "").trim(),
-      endTime: String(row?.endTime ?? fallbackRows[index]?.endTime ?? "").trim(),
+  return sourceRows.map((row, index) => ({
+      dayOfWeek:
+        normalizeWeekdayString(row?.dayOfWeek ?? fallbackRows[index]?.dayOfWeek) ||
+        String(row?.dayOfWeek ?? fallbackRows[index]?.dayOfWeek ?? "").trim(),
+      startTime:
+        normalizeTimeString(row?.startTime ?? fallbackRows[index]?.startTime) ||
+        String(row?.startTime ?? fallbackRows[index]?.startTime ?? "").trim(),
+      endTime:
+        normalizeTimeString(row?.endTime ?? fallbackRows[index]?.endTime) ||
+        String(row?.endTime ?? fallbackRows[index]?.endTime ?? "").trim(),
       ratio: normalizePercentString(row?.ratio ?? fallbackRows[index]?.ratio, "0.00", {
         upgradeLegacyFraction,
       }),
-    }))
-  );
+    }));
 }
 
 function hydrateSimulatorForm(savedForm) {
@@ -362,7 +435,7 @@ function toArray(value) {
   return [value];
 }
 
-function normalizeSlotRows(body, prefix, fallbackRows) {
+function normalizeSlotRows(body, prefix) {
   const dayValues = toArray(body[`${prefix}_slot_day[]`] ?? body[`${prefix}_slot_day`]);
   const startValues = toArray(body[`${prefix}_slot_start[]`] ?? body[`${prefix}_slot_start`]);
   const endValues = toArray(body[`${prefix}_slot_end[]`] ?? body[`${prefix}_slot_end`]);
@@ -377,10 +450,13 @@ function normalizeSlotRows(body, prefix, fallbackRows) {
   const rows = [];
 
   for (let index = 0; index < rowCount; index += 1) {
-    const dayOfWeek = String(dayValues[index] ?? "").trim();
-    const startTime = String(startValues[index] ?? "").trim();
-    const endTime = String(endValues[index] ?? "").trim();
+    const rawDayOfWeek = String(dayValues[index] ?? "").trim();
+    const rawStartTime = String(startValues[index] ?? "").trim();
+    const rawEndTime = String(endValues[index] ?? "").trim();
     const ratio = String(ratioValues[index] ?? "").trim();
+    const dayOfWeek = normalizeWeekdayString(rawDayOfWeek) || rawDayOfWeek;
+    const startTime = normalizeTimeString(rawStartTime) || rawStartTime;
+    const endTime = normalizeTimeString(rawEndTime) || rawEndTime;
 
     if (!dayOfWeek && !startTime && !endTime && !ratio) {
       continue;
@@ -394,7 +470,7 @@ function normalizeSlotRows(body, prefix, fallbackRows) {
     });
   }
 
-  return buildDefaultSlotRows(rows.length > 0 ? rows : fallbackRows);
+  return rows;
 }
 
 function normalizeTeacherStageRows(body, prefix, fallbackRows) {
@@ -455,7 +531,7 @@ function normalizeSimulatorInput(body = {}) {
       ).trim(),
       trainingDays: String(body.trial_training_days ?? defaults.trial.trainingDays).trim(),
       teacherRows: normalizeTeacherStageRows(body, "trial", defaults.trial.teacherRows),
-      slotRows: normalizeSlotRows(body, "trial", defaults.trial.slotRows),
+      slotRows: normalizeSlotRows(body, "trial"),
     },
     paid: {
       currentStudents: String(body.paid_current_students ?? defaults.paid.currentStudents).trim(),
@@ -478,7 +554,7 @@ function normalizeSimulatorInput(body = {}) {
       ).trim(),
       trainingDays: String(body.paid_training_days ?? defaults.paid.trainingDays).trim(),
       teacherRows: normalizeTeacherStageRows(body, "paid", defaults.paid.teacherRows),
-      slotRows: normalizeSlotRows(body, "paid", defaults.paid.slotRows),
+      slotRows: normalizeSlotRows(body, "paid"),
     },
   };
 }
@@ -493,7 +569,7 @@ function isValidDateString(value) {
 }
 
 function isValidTimeString(value) {
-  return /^\d{2}:\d{2}$/.test(String(value || ""));
+  return Boolean(normalizeTimeString(value));
 }
 
 function parseRequiredNumber(value, label, options = {}) {
@@ -548,8 +624,12 @@ function validateSlotRows(rows, label) {
       return `${label} 的热门时段配置必须填写周几。`;
     }
 
+    if (!normalizeWeekdayString(row.dayOfWeek)) {
+      return `${label} 的热门时段周几必须是周一到周日，或使用星期一到星期天的写法。`;
+    }
+
     if (!isValidTimeString(row.startTime) || !isValidTimeString(row.endTime)) {
-      return `${label} 的热门时段开始时间和结束时间必须是 HH:MM。`;
+      return `${label} 的热门时段开始时间和结束时间必须是 HH:MM 或 HH:MM:SS。`;
     }
 
     if (row.startTime >= row.endTime) {
