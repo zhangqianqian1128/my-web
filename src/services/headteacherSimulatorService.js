@@ -6,6 +6,7 @@ const NEW_TOGGLE_OPTIONS = [
 ];
 
 const severityRank = { red: 0, orange: 1, yellow: 2, green: 3 };
+const PERCENTAGE_MAX = 100;
 
 function roundTo(value, digits = 2) {
   const factor = 10 ** digits;
@@ -18,6 +19,27 @@ function safeDivide(numerator, denominator) {
   }
 
   return numerator / denominator;
+}
+
+function formatFixed(value, digits = 2) {
+  return roundTo(value, digits).toFixed(digits);
+}
+
+function normalizePercentString(value, fallback = "0.00", options = {}) {
+  const rawValue = String(value ?? "").trim().replace(/[%％]/g, "");
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number(rawValue);
+
+  if (!Number.isFinite(parsed)) {
+    return rawValue;
+  }
+
+  const shouldUpgradeLegacyFraction = options.upgradeLegacyFraction && parsed >= 0 && parsed <= 1;
+  return formatFixed(shouldUpgradeLegacyFraction ? parsed * 100 : parsed, 2);
 }
 
 function toArray(value) {
@@ -70,6 +92,27 @@ function parseRequiredNumber(value, label, options = {}) {
   return { ok: true, value: parsed };
 }
 
+function parseRequiredPercent(value, label, options = {}) {
+  const numberResult = parseRequiredNumber(
+    String(value ?? "").trim().replace(/[%％]/g, ""),
+    label,
+    {
+      min: typeof options.min === "number" ? options.min : 0,
+      max: typeof options.max === "number" ? options.max : PERCENTAGE_MAX,
+    }
+  );
+
+  if (!numberResult.ok) {
+    return numberResult;
+  }
+
+  return {
+    ok: true,
+    percentValue: roundTo(numberResult.value, 2),
+    value: numberResult.value / 100,
+  };
+}
+
 function buildDefaultHeadteacherRows(rows) {
   if (rows && rows.length > 0) {
     return rows;
@@ -113,13 +156,14 @@ function buildDefaultHeadteacherRows(rows) {
 
 function buildDefaultHeadteacherSimulatorForm() {
   return {
+    formVersion: 2,
     period: {
       forecastMonth: "2026-05",
     },
     students: {
       currentTotalStudents: "860",
       renewalDueStudents: "90",
-      renewalChurnRate: "0.50",
+      renewalChurnRate: "50.00",
       monthlyEcomNewStudents: "70",
       monthlySalesNewStudents: "55",
     },
@@ -127,6 +171,65 @@ function buildDefaultHeadteacherSimulatorForm() {
       defaultServiceLimit: "250",
       defaultNewIntakeLimit: "30",
       rows: buildDefaultHeadteacherRows(),
+    },
+  };
+}
+
+function hydrateHeadteacherSimulatorForm(savedForm) {
+  const defaults = buildDefaultHeadteacherSimulatorForm();
+  const upgradeLegacyFraction = Number(savedForm?.formVersion || 0) < 2;
+
+  if (!savedForm) {
+    return defaults;
+  }
+
+  return {
+    formVersion: 2,
+    period: {
+      forecastMonth: String(savedForm.period?.forecastMonth ?? defaults.period.forecastMonth).trim(),
+    },
+    students: {
+      currentTotalStudents: String(
+        savedForm.students?.currentTotalStudents ?? defaults.students.currentTotalStudents
+      ).trim(),
+      renewalDueStudents: String(
+        savedForm.students?.renewalDueStudents ?? defaults.students.renewalDueStudents
+      ).trim(),
+      renewalChurnRate: normalizePercentString(
+        savedForm.students?.renewalChurnRate,
+        defaults.students.renewalChurnRate,
+        { upgradeLegacyFraction }
+      ),
+      monthlyEcomNewStudents: String(
+        savedForm.students?.monthlyEcomNewStudents ?? defaults.students.monthlyEcomNewStudents
+      ).trim(),
+      monthlySalesNewStudents: String(
+        savedForm.students?.monthlySalesNewStudents ?? defaults.students.monthlySalesNewStudents
+      ).trim(),
+    },
+    team: {
+      defaultServiceLimit: String(
+        savedForm.team?.defaultServiceLimit ?? defaults.team.defaultServiceLimit
+      ).trim(),
+      defaultNewIntakeLimit: String(
+        savedForm.team?.defaultNewIntakeLimit ?? defaults.team.defaultNewIntakeLimit
+      ).trim(),
+      rows: buildDefaultHeadteacherRows(
+        (savedForm.team?.rows || defaults.team.rows).map((row, index) => ({
+          name: String(row?.name ?? defaults.team.rows[index]?.name ?? "").trim(),
+          currentStudents: String(
+            row?.currentStudents ?? defaults.team.rows[index]?.currentStudents ?? ""
+          ).trim(),
+          serviceLimit: String(
+            row?.serviceLimit ?? defaults.team.rows[index]?.serviceLimit ?? ""
+          ).trim(),
+          canTakeNew: String(row?.canTakeNew ?? defaults.team.rows[index]?.canTakeNew ?? "否").trim(),
+          newCapacity: String(
+            row?.newCapacity ?? defaults.team.rows[index]?.newCapacity ?? ""
+          ).trim(),
+          notes: String(row?.notes ?? defaults.team.rows[index]?.notes ?? "").trim(),
+        }))
+      ),
     },
   };
 }
@@ -180,6 +283,7 @@ function normalizeHeadteacherSimulatorInput(body = {}) {
   const defaults = buildDefaultHeadteacherSimulatorForm();
 
   return {
+    formVersion: 2,
     period: {
       forecastMonth: String(body.forecast_month ?? defaults.period.forecastMonth).trim(),
     },
@@ -220,7 +324,6 @@ function validateHeadteacherSimulatorForm(form) {
   const checks = [
     [form.students.currentTotalStudents, "当前总服务学员去重数", { min: 0 }],
     [form.students.renewalDueStudents, "本月到期续费人数", { min: 0 }],
-    [form.students.renewalChurnRate, "续费流失率", { min: 0, max: 1 }],
     [form.students.monthlyEcomNewStudents, "预计本月电商新增学员数", { min: 0 }],
     [form.students.monthlySalesNewStudents, "预计本月新签转正学员数", { min: 0 }],
     [form.team.defaultServiceLimit, "单个班主任默认服务人数上限", { min: 1 }],
@@ -232,6 +335,15 @@ function validateHeadteacherSimulatorForm(form) {
     if (!result.ok) {
       return result.message;
     }
+  }
+
+  const renewalRateResult = parseRequiredPercent(form.students.renewalChurnRate, "续费流失率", {
+    min: 0,
+    max: PERCENTAGE_MAX,
+  });
+
+  if (!renewalRateResult.ok) {
+    return renewalRateResult.message;
   }
 
   if (!form.team.rows || form.team.rows.length === 0) {
@@ -426,7 +538,7 @@ function buildHeadteacherRiskMessage(row) {
 function calculateHeadteacherSimulatorResults(form) {
   const currentTotalStudents = Number(form.students.currentTotalStudents);
   const renewalDueStudents = Number(form.students.renewalDueStudents);
-  const renewalChurnRate = Number(form.students.renewalChurnRate);
+  const renewalChurnRate = parseRequiredPercent(form.students.renewalChurnRate, "续费流失率").value;
   const monthlyEcomNewStudents = Number(form.students.monthlyEcomNewStudents);
   const monthlySalesNewStudents = Number(form.students.monthlySalesNewStudents);
   const defaultServiceLimit = Number(form.team.defaultServiceLimit);
@@ -600,6 +712,24 @@ function calculateHeadteacherSimulatorResults(form) {
 }
 
 function buildHeadteacherSimulatorViewModel(options = {}) {
+  const predictorTabs = [
+    {
+      key: "trial",
+      label: "体验课师资预警",
+      href: "/forecast/simulator/trial",
+    },
+    {
+      key: "paid",
+      label: "正价课师资预警",
+      href: "/forecast/simulator/paid",
+    },
+    {
+      key: "headteacher",
+      label: "班主任预警",
+      href: "/forecast/headteacher-simulator",
+    },
+  ];
+
   return {
     pageTitle: "班主任人员预警",
     activeNav: "headteacher-simulator",
@@ -607,30 +737,20 @@ function buildHeadteacherSimulatorViewModel(options = {}) {
     simulatorForm: options.simulatorForm || buildDefaultHeadteacherSimulatorForm(),
     result: options.result || null,
     errorMessage: options.errorMessage || "",
+    showSettingsExpanded:
+      typeof options.showSettingsExpanded === "boolean"
+        ? options.showSettingsExpanded
+        : !options.result || Boolean(options.errorMessage),
     newToggleOptions: NEW_TOGGLE_OPTIONS,
-    predictorTabs: [
-      {
-        key: "trial",
-        label: "体验课师资预警",
-        href: "/forecast/simulator/trial",
-      },
-      {
-        key: "paid",
-        label: "正价课师资预警",
-        href: "/forecast/simulator/paid",
-      },
-      {
-        key: "headteacher",
-        label: "班主任预警",
-        href: "/forecast/headteacher-simulator",
-      },
-    ],
+    predictorTabs,
+    activePredictorTab: "headteacher",
   };
 }
 
 module.exports = {
   buildHeadteacherSimulatorViewModel,
   buildDefaultHeadteacherSimulatorForm,
+  hydrateHeadteacherSimulatorForm,
   normalizeHeadteacherSimulatorInput,
   validateHeadteacherSimulatorForm,
   calculateHeadteacherSimulatorResults,

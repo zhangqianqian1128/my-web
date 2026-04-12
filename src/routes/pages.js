@@ -5,12 +5,14 @@ const { buildForecastViewModel } = require("../services/forecastService");
 const { buildFutureForecastViewModel } = require("../services/futureForecastService");
 const {
   buildSimulatorViewModel,
+  hydrateSimulatorForm,
   normalizeSimulatorInput,
   validateSimulatorForm,
   calculateSimulatorResults,
 } = require("../services/simulatorService");
 const {
   buildHeadteacherSimulatorViewModel,
+  hydrateHeadteacherSimulatorForm,
   normalizeHeadteacherSimulatorInput,
   validateHeadteacherSimulatorForm,
   calculateHeadteacherSimulatorResults,
@@ -74,14 +76,38 @@ router.get("/forecast/simulator", (req, res) => {
 
 router.get("/forecast/simulator/trial", (req, res) => {
   const db = getDb();
-  const simulatorForm = getSavedPredictorConfig(db, CONFIG_KEYS.simulatorTrial);
-  res.render("simulator", buildSimulatorViewModel({ courseMode: "trial", simulatorForm }));
+  const simulatorForm = hydrateSimulatorForm(getSavedPredictorConfig(db, CONFIG_KEYS.simulatorTrial));
+  const errorMessage = validateSimulatorForm(simulatorForm);
+  const result = errorMessage ? null : calculateSimulatorResults(simulatorForm);
+
+  res.render(
+    "simulator",
+    buildSimulatorViewModel({
+      courseMode: "trial",
+      simulatorForm,
+      result,
+      errorMessage,
+      showSettingsExpanded: !result,
+    })
+  );
 });
 
 router.get("/forecast/simulator/paid", (req, res) => {
   const db = getDb();
-  const simulatorForm = getSavedPredictorConfig(db, CONFIG_KEYS.simulatorPaid);
-  res.render("simulator", buildSimulatorViewModel({ courseMode: "paid", simulatorForm }));
+  const simulatorForm = hydrateSimulatorForm(getSavedPredictorConfig(db, CONFIG_KEYS.simulatorPaid));
+  const errorMessage = validateSimulatorForm(simulatorForm);
+  const result = errorMessage ? null : calculateSimulatorResults(simulatorForm);
+
+  res.render(
+    "simulator",
+    buildSimulatorViewModel({
+      courseMode: "paid",
+      simulatorForm,
+      result,
+      errorMessage,
+      showSettingsExpanded: !result,
+    })
+  );
 });
 
 router.post("/forecast/simulator/trial", (req, res) => {
@@ -140,8 +166,21 @@ router.post("/forecast/simulator/paid", (req, res) => {
 
 router.get("/forecast/headteacher-simulator", (req, res) => {
   const db = getDb();
-  const simulatorForm = getSavedPredictorConfig(db, CONFIG_KEYS.headteacherSimulator);
-  res.render("headteacher-simulator", buildHeadteacherSimulatorViewModel({ simulatorForm }));
+  const simulatorForm = hydrateHeadteacherSimulatorForm(
+    getSavedPredictorConfig(db, CONFIG_KEYS.headteacherSimulator)
+  );
+  const errorMessage = validateHeadteacherSimulatorForm(simulatorForm);
+  const result = errorMessage ? null : calculateHeadteacherSimulatorResults(simulatorForm);
+
+  res.render(
+    "headteacher-simulator",
+    buildHeadteacherSimulatorViewModel({
+      simulatorForm,
+      result,
+      errorMessage,
+      showSettingsExpanded: !result,
+    })
+  );
 });
 
 router.post("/forecast/headteacher-simulator", (req, res) => {

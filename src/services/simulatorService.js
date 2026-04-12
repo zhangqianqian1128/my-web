@@ -15,7 +15,53 @@ const SUMMARY_GRANULARITY_OPTIONS = [
   { value: "month", label: "按月" },
 ];
 
+const TEACHER_STAGE_DEFINITIONS = [
+  {
+    key: "full_time_training",
+    typeKey: "full_time",
+    typeLabel: "全职",
+    stageKey: "training",
+    stageLabel: "培训期",
+  },
+  {
+    key: "full_time_rookie",
+    typeKey: "full_time",
+    typeLabel: "全职",
+    stageKey: "rookie",
+    stageLabel: "新手期",
+  },
+  {
+    key: "full_time_regular",
+    typeKey: "full_time",
+    typeLabel: "全职",
+    stageKey: "regular",
+    stageLabel: "正式期",
+  },
+  {
+    key: "part_time_training",
+    typeKey: "part_time",
+    typeLabel: "兼职",
+    stageKey: "training",
+    stageLabel: "培训期",
+  },
+  {
+    key: "part_time_rookie",
+    typeKey: "part_time",
+    typeLabel: "兼职",
+    stageKey: "rookie",
+    stageLabel: "新手期",
+  },
+  {
+    key: "part_time_regular",
+    typeKey: "part_time",
+    typeLabel: "兼职",
+    stageKey: "regular",
+    stageLabel: "正式期",
+  },
+];
+
 const severityRank = { red: 0, orange: 1, yellow: 2, green: 3 };
+const PERCENTAGE_MAX = 100;
 
 function roundTo(value, digits = 2) {
   const factor = 10 ** digits;
@@ -28,6 +74,28 @@ function safeDivide(numerator, denominator) {
   }
 
   return numerator / denominator;
+}
+
+function formatFixed(value, digits = 2) {
+  return roundTo(value, digits).toFixed(digits);
+}
+
+function normalizePercentString(value, fallback = "0.00", options = {}) {
+  const rawValue = String(value ?? "").trim().replace(/[%％]/g, "");
+
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number(rawValue);
+
+  if (!Number.isFinite(parsed)) {
+    return rawValue;
+  }
+
+  const shouldUpgradeLegacyFraction = options.upgradeLegacyFraction && parsed >= 0 && parsed <= 1;
+  const percentValue = shouldUpgradeLegacyFraction ? parsed * 100 : parsed;
+  return formatFixed(percentValue, 2);
 }
 
 function toDate(value) {
@@ -63,14 +131,94 @@ function buildDefaultSlotRows(rows) {
   }
 
   return [
-    { dayOfWeek: "周三", startTime: "18:00", endTime: "19:00", ratio: "0.40" },
-    { dayOfWeek: "周三", startTime: "19:00", endTime: "20:00", ratio: "0.30" },
-    { dayOfWeek: "周六", startTime: "10:00", endTime: "11:00", ratio: "0.30" },
+    { dayOfWeek: "周三", startTime: "18:00", endTime: "19:00", ratio: "40.00" },
+    { dayOfWeek: "周三", startTime: "19:00", endTime: "20:00", ratio: "30.00" },
+    { dayOfWeek: "周六", startTime: "10:00", endTime: "11:00", ratio: "30.00" },
   ];
+}
+
+function buildTeacherStageKey(typeKey, stageKey) {
+  return `${String(typeKey || "").trim()}_${String(stageKey || "").trim()}`;
+}
+
+function buildDefaultTeacherStageRows(overrides = {}) {
+  return TEACHER_STAGE_DEFINITIONS.map((definition) => ({
+    ...definition,
+    teacherCount: String(overrides[definition.key]?.teacherCount ?? "0").trim(),
+    weeklyClasses: String(overrides[definition.key]?.weeklyClasses ?? "0").trim(),
+  }));
+}
+
+function buildTeacherStageRows(rows, fallbackRows = []) {
+  const sourceMap = new Map();
+  const fallbackMap = new Map();
+
+  (rows || []).forEach((row) => {
+    const key = buildTeacherStageKey(row?.typeKey ?? row?.type, row?.stageKey ?? row?.stage);
+    if (key !== "_") {
+      sourceMap.set(key, row);
+    }
+  });
+
+  (fallbackRows || []).forEach((row) => {
+    const key = row?.key || buildTeacherStageKey(row?.typeKey ?? row?.type, row?.stageKey ?? row?.stage);
+    if (key !== "_") {
+      fallbackMap.set(key, row);
+    }
+  });
+
+  return TEACHER_STAGE_DEFINITIONS.map((definition) => {
+    const source = sourceMap.get(definition.key);
+    const fallback = fallbackMap.get(definition.key);
+
+    return {
+      ...definition,
+      teacherCount: String(source?.teacherCount ?? fallback?.teacherCount ?? "0").trim(),
+      weeklyClasses: String(source?.weeklyClasses ?? fallback?.weeklyClasses ?? "0").trim(),
+    };
+  });
+}
+
+function mapLegacyTeacherStageOverrides(courseConfig = {}) {
+  const hasLegacyTeacherFields =
+    courseConfig.fullTimeTeachers !== undefined ||
+    courseConfig.fullTimeWeeklyClasses !== undefined ||
+    courseConfig.partTimeTeachers !== undefined ||
+    courseConfig.partTimeWeeklyClasses !== undefined;
+
+  if (!hasLegacyTeacherFields) {
+    return null;
+  }
+
+  return {
+    full_time_regular: {
+      teacherCount: String(courseConfig.fullTimeTeachers ?? "0").trim(),
+      weeklyClasses: String(courseConfig.fullTimeWeeklyClasses ?? "0").trim(),
+    },
+    part_time_regular: {
+      teacherCount: String(courseConfig.partTimeTeachers ?? "0").trim(),
+      weeklyClasses: String(courseConfig.partTimeWeeklyClasses ?? "0").trim(),
+    },
+  };
+}
+
+function hydrateTeacherStageRows(courseConfig, fallbackRows) {
+  if (Array.isArray(courseConfig?.teacherRows) && courseConfig.teacherRows.length > 0) {
+    return buildTeacherStageRows(courseConfig.teacherRows, fallbackRows);
+  }
+
+  const legacyOverrides = mapLegacyTeacherStageOverrides(courseConfig);
+
+  if (legacyOverrides) {
+    return buildDefaultTeacherStageRows(legacyOverrides);
+  }
+
+  return buildTeacherStageRows(fallbackRows, fallbackRows);
 }
 
 function buildDefaultSimulatorForm() {
   return {
+    formVersion: 3,
     period: {
       startDate: "2026-05-01",
       endDate: "2026-05-28",
@@ -78,35 +226,126 @@ function buildDefaultSimulatorForm() {
     },
     trial: {
       assignedLeads: "320",
-      attendRate: "0.65",
+      attendRate: "65.00",
       classSize: "4",
       recruitmentDays: "7",
       trainingDays: "14",
-      fullTimeTeachers: "3",
-      fullTimeWeeklyClasses: "18",
-      partTimeTeachers: "2",
-      partTimeWeeklyClasses: "8",
+      teacherRows: buildDefaultTeacherStageRows({
+        full_time_training: { teacherCount: "0", weeklyClasses: "0" },
+        full_time_rookie: { teacherCount: "1", weeklyClasses: "10" },
+        full_time_regular: { teacherCount: "3", weeklyClasses: "18" },
+        part_time_training: { teacherCount: "0", weeklyClasses: "0" },
+        part_time_rookie: { teacherCount: "1", weeklyClasses: "4" },
+        part_time_regular: { teacherCount: "2", weeklyClasses: "8" },
+      }),
       slotRows: buildDefaultSlotRows(),
     },
     paid: {
       currentStudents: "180",
       renewalDueStudents: "36",
-      renewalChurnRate: "0.20",
+      renewalChurnRate: "20.00",
       salesConvertedStarts: "42",
       ecomStarts: "24",
       studentWeeklyClasses: "2",
       classSize: "6",
       recruitmentDays: "10",
       trainingDays: "21",
-      fullTimeTeachers: "4",
-      fullTimeWeeklyClasses: "14",
-      partTimeTeachers: "2",
-      partTimeWeeklyClasses: "6",
+      teacherRows: buildDefaultTeacherStageRows({
+        full_time_training: { teacherCount: "0", weeklyClasses: "0" },
+        full_time_rookie: { teacherCount: "1", weeklyClasses: "8" },
+        full_time_regular: { teacherCount: "4", weeklyClasses: "14" },
+        part_time_training: { teacherCount: "0", weeklyClasses: "0" },
+        part_time_rookie: { teacherCount: "0", weeklyClasses: "0" },
+        part_time_regular: { teacherCount: "2", weeklyClasses: "6" },
+      }),
       slotRows: buildDefaultSlotRows([
-        { dayOfWeek: "周二", startTime: "19:00", endTime: "20:00", ratio: "0.35" },
-        { dayOfWeek: "周四", startTime: "19:00", endTime: "20:00", ratio: "0.35" },
-        { dayOfWeek: "周六", startTime: "09:00", endTime: "10:00", ratio: "0.30" },
+        { dayOfWeek: "周二", startTime: "19:00", endTime: "20:00", ratio: "35.00" },
+        { dayOfWeek: "周四", startTime: "19:00", endTime: "20:00", ratio: "35.00" },
+        { dayOfWeek: "周六", startTime: "09:00", endTime: "10:00", ratio: "30.00" },
       ]),
+    },
+  };
+}
+
+function hydrateSlotRows(rows, fallbackRows, upgradeLegacyFraction = false) {
+  const sourceRows = Array.isArray(rows) && rows.length > 0 ? rows : fallbackRows;
+
+  return buildDefaultSlotRows(
+    sourceRows.map((row, index) => ({
+      dayOfWeek: String(row?.dayOfWeek ?? fallbackRows[index]?.dayOfWeek ?? "").trim(),
+      startTime: String(row?.startTime ?? fallbackRows[index]?.startTime ?? "").trim(),
+      endTime: String(row?.endTime ?? fallbackRows[index]?.endTime ?? "").trim(),
+      ratio: normalizePercentString(row?.ratio ?? fallbackRows[index]?.ratio, "0.00", {
+        upgradeLegacyFraction,
+      }),
+    }))
+  );
+}
+
+function hydrateSimulatorForm(savedForm) {
+  const defaults = buildDefaultSimulatorForm();
+  const upgradeLegacyFraction = Number(savedForm?.formVersion || 0) < 2;
+
+  if (!savedForm) {
+    return defaults;
+  }
+
+  return {
+    formVersion: 3,
+    period: {
+      startDate: String(savedForm.period?.startDate ?? defaults.period.startDate).trim(),
+      endDate: String(savedForm.period?.endDate ?? defaults.period.endDate).trim(),
+      summaryGranularity: String(
+        savedForm.period?.summaryGranularity ?? defaults.period.summaryGranularity
+      ).trim(),
+    },
+    trial: {
+      assignedLeads: String(savedForm.trial?.assignedLeads ?? defaults.trial.assignedLeads).trim(),
+      attendRate: normalizePercentString(savedForm.trial?.attendRate, defaults.trial.attendRate, {
+        upgradeLegacyFraction,
+      }),
+      classSize: String(savedForm.trial?.classSize ?? defaults.trial.classSize).trim(),
+      recruitmentDays: String(
+        savedForm.trial?.recruitmentDays ?? defaults.trial.recruitmentDays
+      ).trim(),
+      trainingDays: String(savedForm.trial?.trainingDays ?? defaults.trial.trainingDays).trim(),
+      teacherRows: hydrateTeacherStageRows(savedForm.trial, defaults.trial.teacherRows),
+      slotRows: hydrateSlotRows(
+        savedForm.trial?.slotRows,
+        defaults.trial.slotRows,
+        upgradeLegacyFraction
+      ),
+    },
+    paid: {
+      currentStudents: String(
+        savedForm.paid?.currentStudents ?? defaults.paid.currentStudents
+      ).trim(),
+      renewalDueStudents: String(
+        savedForm.paid?.renewalDueStudents ?? defaults.paid.renewalDueStudents
+      ).trim(),
+      renewalChurnRate: normalizePercentString(
+        savedForm.paid?.renewalChurnRate,
+        defaults.paid.renewalChurnRate,
+        { upgradeLegacyFraction }
+      ),
+      salesConvertedStarts: String(
+        savedForm.paid?.salesConvertedStarts ?? defaults.paid.salesConvertedStarts
+      ).trim(),
+      ecomStarts: String(savedForm.paid?.ecomStarts ?? defaults.paid.ecomStarts).trim(),
+      studentWeeklyClasses: String(
+        savedForm.paid?.studentWeeklyClasses ?? defaults.paid.studentWeeklyClasses
+      ).trim(),
+      classSize: String(savedForm.paid?.classSize ?? defaults.paid.classSize).trim(),
+      recruitmentDays: String(
+        savedForm.paid?.recruitmentDays ?? defaults.paid.recruitmentDays
+      ).trim(),
+      trainingDays: String(savedForm.paid?.trainingDays ?? defaults.paid.trainingDays).trim(),
+      teacherRows: hydrateTeacherStageRows(savedForm.paid, defaults.paid.teacherRows),
+      slotRows: hydrateSlotRows(
+        savedForm.paid?.slotRows,
+        defaults.paid.slotRows,
+        upgradeLegacyFraction
+      ),
     },
   };
 }
@@ -158,10 +397,50 @@ function normalizeSlotRows(body, prefix, fallbackRows) {
   return buildDefaultSlotRows(rows.length > 0 ? rows : fallbackRows);
 }
 
+function normalizeTeacherStageRows(body, prefix, fallbackRows) {
+  const typeValues = toArray(body[`${prefix}_teacher_type[]`] ?? body[`${prefix}_teacher_type`]);
+  const stageValues = toArray(body[`${prefix}_teacher_stage[]`] ?? body[`${prefix}_teacher_stage`]);
+  const teacherCountValues = toArray(
+    body[`${prefix}_teacher_count[]`] ?? body[`${prefix}_teacher_count`]
+  );
+  const weeklyClassValues = toArray(
+    body[`${prefix}_teacher_weekly_classes[]`] ?? body[`${prefix}_teacher_weekly_classes`]
+  );
+  const rowCount = Math.max(
+    typeValues.length,
+    stageValues.length,
+    teacherCountValues.length,
+    weeklyClassValues.length
+  );
+
+  const rows = [];
+
+  for (let index = 0; index < rowCount; index += 1) {
+    const typeKey = String(typeValues[index] ?? "").trim();
+    const stageKey = String(stageValues[index] ?? "").trim();
+    const teacherCount = String(teacherCountValues[index] ?? "").trim();
+    const weeklyClasses = String(weeklyClassValues[index] ?? "").trim();
+
+    if (!typeKey || !stageKey) {
+      continue;
+    }
+
+    rows.push({
+      typeKey,
+      stageKey,
+      teacherCount,
+      weeklyClasses,
+    });
+  }
+
+  return buildTeacherStageRows(rows.length > 0 ? rows : fallbackRows, fallbackRows);
+}
+
 function normalizeSimulatorInput(body = {}) {
   const defaults = buildDefaultSimulatorForm();
 
   return {
+    formVersion: 3,
     period: {
       startDate: String(body.start_date ?? defaults.period.startDate).trim(),
       endDate: String(body.end_date ?? defaults.period.endDate).trim(),
@@ -175,14 +454,7 @@ function normalizeSimulatorInput(body = {}) {
         body.trial_recruitment_days ?? defaults.trial.recruitmentDays
       ).trim(),
       trainingDays: String(body.trial_training_days ?? defaults.trial.trainingDays).trim(),
-      fullTimeTeachers: String(body.trial_full_time_teachers ?? defaults.trial.fullTimeTeachers).trim(),
-      fullTimeWeeklyClasses: String(
-        body.trial_full_time_weekly_classes ?? defaults.trial.fullTimeWeeklyClasses
-      ).trim(),
-      partTimeTeachers: String(body.trial_part_time_teachers ?? defaults.trial.partTimeTeachers).trim(),
-      partTimeWeeklyClasses: String(
-        body.trial_part_time_weekly_classes ?? defaults.trial.partTimeWeeklyClasses
-      ).trim(),
+      teacherRows: normalizeTeacherStageRows(body, "trial", defaults.trial.teacherRows),
       slotRows: normalizeSlotRows(body, "trial", defaults.trial.slotRows),
     },
     paid: {
@@ -205,14 +477,7 @@ function normalizeSimulatorInput(body = {}) {
         body.paid_recruitment_days ?? defaults.paid.recruitmentDays
       ).trim(),
       trainingDays: String(body.paid_training_days ?? defaults.paid.trainingDays).trim(),
-      fullTimeTeachers: String(body.paid_full_time_teachers ?? defaults.paid.fullTimeTeachers).trim(),
-      fullTimeWeeklyClasses: String(
-        body.paid_full_time_weekly_classes ?? defaults.paid.fullTimeWeeklyClasses
-      ).trim(),
-      partTimeTeachers: String(body.paid_part_time_teachers ?? defaults.paid.partTimeTeachers).trim(),
-      partTimeWeeklyClasses: String(
-        body.paid_part_time_weekly_classes ?? defaults.paid.partTimeWeeklyClasses
-      ).trim(),
+      teacherRows: normalizeTeacherStageRows(body, "paid", defaults.paid.teacherRows),
       slotRows: normalizeSlotRows(body, "paid", defaults.paid.slotRows),
     },
   };
@@ -249,6 +514,28 @@ function parseRequiredNumber(value, label, options = {}) {
   return { ok: true, value: parsed };
 }
 
+function parseRequiredPercent(value, label, options = {}) {
+  const percentLabel = label.includes("占比") || label.includes("率") ? label : `${label} 百分比`;
+  const numberResult = parseRequiredNumber(
+    String(value ?? "").trim().replace(/[%％]/g, ""),
+    percentLabel,
+    {
+      min: typeof options.min === "number" ? options.min : 0,
+      max: typeof options.max === "number" ? options.max : PERCENTAGE_MAX,
+    }
+  );
+
+  if (!numberResult.ok) {
+    return numberResult;
+  }
+
+  return {
+    ok: true,
+    percentValue: roundTo(numberResult.value, 2),
+    value: numberResult.value / 100,
+  };
+}
+
 function validateSlotRows(rows, label) {
   if (!rows || rows.length === 0) {
     return `${label} 至少需要配置 1 个热门时段。`;
@@ -269,9 +556,9 @@ function validateSlotRows(rows, label) {
       return `${label} 的热门时段开始时间必须早于结束时间。`;
     }
 
-    const ratioResult = parseRequiredNumber(row.ratio, `${label} 热门时段占比`, {
+    const ratioResult = parseRequiredPercent(row.ratio, `${label} 热门时段占比`, {
       min: 0,
-      max: 1,
+      max: PERCENTAGE_MAX,
     });
 
     if (!ratioResult.ok) {
@@ -282,7 +569,7 @@ function validateSlotRows(rows, label) {
   }
 
   if (ratioSum > 1.000001) {
-    return `${label} 热门时段占比合计不能超过 1，当前为 ${roundTo(ratioSum, 2)}。未配置的剩余占比会视为普通时段。`;
+    return `${label} 热门时段占比合计不能超过 100%，当前为 ${formatFixed(ratioSum * 100, 2)}%。未配置的剩余占比会视为普通时段。`;
   }
 
   return "";
@@ -290,9 +577,67 @@ function validateSlotRows(rows, label) {
 
 function sumSlotRatios(rows) {
   return roundTo(
-    (rows || []).reduce((sum, row) => sum + Number(row.ratio || 0), 0),
-    2
+    (rows || []).reduce((sum, row) => {
+      const parsed = parseRequiredPercent(row.ratio, "热门时段占比");
+      return sum + (parsed.ok ? parsed.value : 0);
+    }, 0),
+    4
   );
+}
+
+function validateTeacherStageRows(rows, label) {
+  if (!rows || rows.length === 0) {
+    return `${label} 至少需要配置 1 行师资。`;
+  }
+
+  for (const row of rows) {
+    const rowLabel = `${label}：${row.typeLabel}${row.stageLabel}`;
+
+    const teacherCountResult = parseRequiredNumber(row.teacherCount, `${rowLabel}人数`, { min: 0 });
+    if (!teacherCountResult.ok) {
+      return teacherCountResult.message;
+    }
+
+    const weeklyClassesResult = parseRequiredNumber(row.weeklyClasses, `${rowLabel}周课次`, {
+      min: 0,
+    });
+    if (!weeklyClassesResult.ok) {
+      return weeklyClassesResult.message;
+    }
+  }
+
+  return "";
+}
+
+function summarizeTeacherStageRows(rows) {
+  const totalTeachers = (rows || []).reduce(
+    (sum, row) => sum + Math.max(0, Number(row.teacherCount) || 0),
+    0
+  );
+  const weeklySupplyClasses = (rows || []).reduce(
+    (sum, row) =>
+      sum +
+      Math.max(0, Number(row.teacherCount) || 0) * Math.max(0, Number(row.weeklyClasses) || 0),
+    0
+  );
+  const regularFullTimeRow = (rows || []).find(
+    (row) => row.typeKey === "full_time" && row.stageKey === "regular"
+  );
+  const fullTimeWeeklyClasses = (rows || [])
+    .filter((row) => row.typeKey === "full_time")
+    .map((row) => Math.max(0, Number(row.weeklyClasses) || 0));
+  const allWeeklyClasses = (rows || []).map((row) => Math.max(0, Number(row.weeklyClasses) || 0));
+  const shortageTeacherBaseline =
+    Math.max(0, Number(regularFullTimeRow?.weeklyClasses) || 0) ||
+    Math.max(0, ...fullTimeWeeklyClasses) ||
+    Math.max(0, ...allWeeklyClasses) ||
+    1;
+
+  return {
+    totalTeachers,
+    weeklySupplyClasses,
+    shortageTeacherBaseline,
+  };
 }
 
 function validateSimulatorForm(form) {
@@ -310,27 +655,17 @@ function validateSimulatorForm(form) {
 
   const numberChecks = [
     [form.trial.assignedLeads, "体验课：预测周期分配线索数", { min: 0 }],
-    [form.trial.attendRate, "体验课：预测周期到课率", { min: 0, max: 1 }],
     [form.trial.classSize, "体验课：每班级人数", { min: 1 }],
     [form.trial.recruitmentDays, "体验课：老师招聘周期", { min: 0 }],
     [form.trial.trainingDays, "体验课：老师入职培训周期", { min: 0 }],
-    [form.trial.fullTimeTeachers, "体验课：全职老师数", { min: 0 }],
-    [form.trial.fullTimeWeeklyClasses, "体验课：全职单师周带班数", { min: 1 }],
-    [form.trial.partTimeTeachers, "体验课：兼职老师数", { min: 0 }],
-    [form.trial.partTimeWeeklyClasses, "体验课：兼职单师周带班数", { min: 0 }],
     [form.paid.currentStudents, "正价课：当前总在课人数", { min: 0 }],
     [form.paid.renewalDueStudents, "正价课：其中本期待续费人数", { min: 0 }],
-    [form.paid.renewalChurnRate, "正价课：续费流失率", { min: 0, max: 1 }],
     [form.paid.salesConvertedStarts, "正价课：预测周期销售转化入课人数", { min: 0 }],
     [form.paid.ecomStarts, "正价课：预测周期电商新签入课人数", { min: 0 }],
     [form.paid.studentWeeklyClasses, "正价课：每生周课次", { min: 0 }],
     [form.paid.classSize, "正价课：班级人数", { min: 1 }],
     [form.paid.recruitmentDays, "正价课：老师招聘周期", { min: 0 }],
     [form.paid.trainingDays, "正价课：老师入职培训周期", { min: 0 }],
-    [form.paid.fullTimeTeachers, "正价课：全职老师数", { min: 0 }],
-    [form.paid.fullTimeWeeklyClasses, "正价课：全职单师周带班数", { min: 1 }],
-    [form.paid.partTimeTeachers, "正价课：兼职老师数", { min: 0 }],
-    [form.paid.partTimeWeeklyClasses, "正价课：兼职单师周带班数", { min: 0 }],
   ];
 
   for (const [value, label, options] of numberChecks) {
@@ -338,6 +673,28 @@ function validateSimulatorForm(form) {
     if (!result.ok) {
       return result.message;
     }
+  }
+
+  const percentChecks = [
+    [form.trial.attendRate, "体验课：预测周期到课率", { min: 0, max: PERCENTAGE_MAX }],
+    [form.paid.renewalChurnRate, "正价课：续费流失率", { min: 0, max: PERCENTAGE_MAX }],
+  ];
+
+  for (const [value, label, options] of percentChecks) {
+    const result = parseRequiredPercent(value, label, options);
+    if (!result.ok) {
+      return result.message;
+    }
+  }
+
+  const trialTeacherError = validateTeacherStageRows(form.trial.teacherRows, "体验课师资配置");
+  if (trialTeacherError) {
+    return trialTeacherError;
+  }
+
+  const paidTeacherError = validateTeacherStageRows(form.paid.teacherRows, "正价课师资配置");
+  if (paidTeacherError) {
+    return paidTeacherError;
   }
 
   const trialSlotError = validateSlotRows(form.trial.slotRows, "体验课");
@@ -395,7 +752,7 @@ function computeSlotRows(
   totalAvailableTeachers
 ) {
   return slotRows.map((row) => {
-    const ratio = Number(row.ratio || 0);
+    const ratio = parseRequiredPercent(row.ratio, `${courseLabel} 热门时段占比`).value;
     const requiredTeachers = Math.ceil(weeklyRequiredClasses * ratio);
     const availableTeachers = Number(totalAvailableTeachers || 0);
     const slotGap = availableTeachers - requiredTeachers;
@@ -408,7 +765,8 @@ function computeSlotRows(
       courseLabel,
       dayOfWeek: row.dayOfWeek,
       timeRange: `${row.startTime}-${row.endTime}`,
-      ratio: roundTo(ratio, 2),
+      ratio,
+      ratioDisplay: `${formatFixed(ratio * 100, 2)}%`,
       weeklyRequiredClasses,
       requiredTeachers,
       availableTeachers,
@@ -478,21 +836,15 @@ function calculateSimulatorResults(form) {
   const weekCount = computeWeekCount(form.period.startDate, form.period.endDate);
 
   const trialAssignedLeads = Number(form.trial.assignedLeads);
-  const trialAttendRate = Number(form.trial.attendRate);
+  const trialAttendRate = parseRequiredPercent(form.trial.attendRate, "体验课到课率").value;
   const trialClassSize = Number(form.trial.classSize);
   const trialRecruitmentDays = Number(form.trial.recruitmentDays);
   const trialTrainingDays = Number(form.trial.trainingDays);
-  const trialFullTimeTeachers = Number(form.trial.fullTimeTeachers);
-  const trialFullTimeWeeklyClasses = Number(form.trial.fullTimeWeeklyClasses);
-  const trialPartTimeTeachers = Number(form.trial.partTimeTeachers);
-  const trialPartTimeWeeklyClasses = Number(form.trial.partTimeWeeklyClasses);
+  const trialTeacherSummary = summarizeTeacherStageRows(form.trial.teacherRows);
 
   const trialArrivals = roundTo(trialAssignedLeads * trialAttendRate, 2);
   const trialRequiredClasses = trialArrivals > 0 ? Math.ceil(trialArrivals / trialClassSize) : 0;
-  const trialSupplyClasses =
-    (trialFullTimeTeachers * trialFullTimeWeeklyClasses +
-      trialPartTimeTeachers * trialPartTimeWeeklyClasses) *
-    weekCount;
+  const trialSupplyClasses = trialTeacherSummary.weeklySupplyClasses * weekCount;
   const trialGapClasses = trialSupplyClasses - trialRequiredClasses;
   const trialWeeklyRequiredClasses =
     trialRequiredClasses > 0 ? Math.ceil(trialRequiredClasses / weekCount) : 0;
@@ -500,21 +852,23 @@ function calculateSimulatorResults(form) {
   const trialUtilization = safeDivide(trialRequiredClasses, trialSupplyClasses);
   const trialWarningLevel = getUtilizationWarningLevel(trialUtilization);
   const trialGapTeachers =
-    trialGapClasses >= 0 ? 0 : Math.ceil(Math.abs(trialGapClasses) / trialFullTimeWeeklyClasses);
+    trialGapClasses >= 0
+      ? 0
+      : Math.ceil(Math.abs(trialGapClasses) / trialTeacherSummary.shortageTeacherBaseline);
 
   const paidCurrentStudents = Number(form.paid.currentStudents);
   const paidRenewalDueStudents = Number(form.paid.renewalDueStudents);
-  const paidRenewalChurnRate = Number(form.paid.renewalChurnRate);
+  const paidRenewalChurnRate = parseRequiredPercent(
+    form.paid.renewalChurnRate,
+    "正价课续费流失率"
+  ).value;
   const paidSalesConvertedStarts = Number(form.paid.salesConvertedStarts);
   const paidEcomStarts = Number(form.paid.ecomStarts);
   const paidStudentWeeklyClasses = Number(form.paid.studentWeeklyClasses);
   const paidClassSize = Number(form.paid.classSize);
   const paidRecruitmentDays = Number(form.paid.recruitmentDays);
   const paidTrainingDays = Number(form.paid.trainingDays);
-  const paidFullTimeTeachers = Number(form.paid.fullTimeTeachers);
-  const paidFullTimeWeeklyClasses = Number(form.paid.fullTimeWeeklyClasses);
-  const paidPartTimeTeachers = Number(form.paid.partTimeTeachers);
-  const paidPartTimeWeeklyClasses = Number(form.paid.partTimeWeeklyClasses);
+  const paidTeacherSummary = summarizeTeacherStageRows(form.paid.teacherRows);
 
   const renewalLostStudents = roundTo(paidRenewalDueStudents * paidRenewalChurnRate, 2);
   const paidProjectedStudents = roundTo(
@@ -525,10 +879,7 @@ function calculateSimulatorResults(form) {
     paidProjectedStudents > 0
       ? Math.ceil((paidProjectedStudents * paidStudentWeeklyClasses * weekCount) / paidClassSize)
       : 0;
-  const paidSupplyClasses =
-    (paidFullTimeTeachers * paidFullTimeWeeklyClasses +
-      paidPartTimeTeachers * paidPartTimeWeeklyClasses) *
-    weekCount;
+  const paidSupplyClasses = paidTeacherSummary.weeklySupplyClasses * weekCount;
   const paidGapClasses = paidSupplyClasses - paidRequiredClasses;
   const paidWeeklyRequiredClasses =
     paidRequiredClasses > 0 ? Math.ceil(paidRequiredClasses / weekCount) : 0;
@@ -536,21 +887,23 @@ function calculateSimulatorResults(form) {
   const paidUtilization = safeDivide(paidRequiredClasses, paidSupplyClasses);
   const paidWarningLevel = getUtilizationWarningLevel(paidUtilization);
   const paidGapTeachers =
-    paidGapClasses >= 0 ? 0 : Math.ceil(Math.abs(paidGapClasses) / paidFullTimeWeeklyClasses);
+    paidGapClasses >= 0
+      ? 0
+      : Math.ceil(Math.abs(paidGapClasses) / paidTeacherSummary.shortageTeacherBaseline);
 
   const trialSlotRows = computeSlotRows(
     "体验课",
     "trial",
     form.trial.slotRows,
     trialWeeklyRequiredClasses,
-    trialFullTimeTeachers + trialPartTimeTeachers
+    trialTeacherSummary.totalTeachers
   );
   const paidSlotRows = computeSlotRows(
     "正价课",
     "paid",
     form.paid.slotRows,
     paidWeeklyRequiredClasses,
-    paidFullTimeTeachers + paidPartTimeTeachers
+    paidTeacherSummary.totalTeachers
   );
   const allSlotRows = [...trialSlotRows, ...paidSlotRows];
   const highestSlotWarning = pickHighestSlotWarning(allSlotRows);
@@ -582,13 +935,21 @@ function calculateSimulatorResults(form) {
       requiredClasses: trialRequiredClasses,
       weeklyRequiredClasses: trialWeeklyRequiredClasses,
       slotRatioSum: trialSlotRatioSum,
+      slotRatioSumDisplay: `${formatFixed(trialSlotRatioSum * 100, 2)}%`,
       remainingOrdinaryRatio: roundTo(Math.max(0, 1 - trialSlotRatioSum), 2),
+      remainingOrdinaryRatioDisplay: `${formatFixed(
+        Math.max(0, 1 - trialSlotRatioSum) * 100,
+        2
+      )}%`,
       supplyClasses: trialSupplyClasses,
       gapClasses: trialGapClasses,
       shortageTeacherCount: trialGapTeachers,
       shortageStartDate: trialShortageStartDate,
       recruitmentDays: trialRecruitmentDays,
       trainingDays: trialTrainingDays,
+      teacherRows: form.trial.teacherRows,
+      totalTeachers: trialTeacherSummary.totalTeachers,
+      weeklySupplyClasses: trialTeacherSummary.weeklySupplyClasses,
       recruitLeadDays: trialLeadDays,
       latestRecruitStartDate: trialRecruitStartDate,
       utilization: trialUtilization,
@@ -611,13 +972,21 @@ function calculateSimulatorResults(form) {
       requiredClasses: paidRequiredClasses,
       weeklyRequiredClasses: paidWeeklyRequiredClasses,
       slotRatioSum: paidSlotRatioSum,
+      slotRatioSumDisplay: `${formatFixed(paidSlotRatioSum * 100, 2)}%`,
       remainingOrdinaryRatio: roundTo(Math.max(0, 1 - paidSlotRatioSum), 2),
+      remainingOrdinaryRatioDisplay: `${formatFixed(
+        Math.max(0, 1 - paidSlotRatioSum) * 100,
+        2
+      )}%`,
       supplyClasses: paidSupplyClasses,
       gapClasses: paidGapClasses,
       shortageTeacherCount: paidGapTeachers,
       shortageStartDate: paidShortageStartDate,
       recruitmentDays: paidRecruitmentDays,
       trainingDays: paidTrainingDays,
+      teacherRows: form.paid.teacherRows,
+      totalTeachers: paidTeacherSummary.totalTeachers,
+      weeklySupplyClasses: paidTeacherSummary.weeklySupplyClasses,
       recruitLeadDays: paidLeadDays,
       latestRecruitStartDate: paidRecruitStartDate,
       utilization: paidUtilization,
@@ -661,6 +1030,23 @@ function buildSimulatorViewModel(options = {}) {
   const result = options.result || null;
   const courseMeta = getCourseMeta(courseMode);
   const slotRows = result ? result.slotRows.filter((row) => row.courseType === courseMode) : [];
+  const predictorTabs = [
+    {
+      key: "trial",
+      label: "体验课师资预警",
+      href: "/forecast/simulator/trial",
+    },
+    {
+      key: "paid",
+      label: "正价课师资预警",
+      href: "/forecast/simulator/paid",
+    },
+    {
+      key: "headteacher",
+      label: "班主任预警",
+      href: "/forecast/headteacher-simulator",
+    },
+  ];
 
   return {
     pageTitle: courseMeta.pageTitle,
@@ -668,34 +1054,26 @@ function buildSimulatorViewModel(options = {}) {
     simulatorForm,
     errorMessage: options.errorMessage || "",
     result,
+    showSettingsExpanded:
+      typeof options.showSettingsExpanded === "boolean"
+        ? options.showSettingsExpanded
+        : !result || Boolean(options.errorMessage),
     courseMode,
     courseMeta,
     slotRows,
     highestSlotWarningByCourse: pickHighestSlotWarning(slotRows),
-    courseTabs: [
-      {
-        key: "trial",
-        label: "体验课师资预警",
-        href: "/forecast/simulator/trial",
-      },
-      {
-        key: "paid",
-        label: "正价课师资预警",
-        href: "/forecast/simulator/paid",
-      },
-      {
-        key: "headteacher",
-        label: "班主任预警",
-        href: "/forecast/headteacher-simulator",
-      },
-    ],
+    predictorTabs,
+    activePredictorTab: courseMode,
+    courseTabs: predictorTabs,
     weekdayOptions: WEEKDAY_OPTIONS,
     summaryGranularityOptions: SUMMARY_GRANULARITY_OPTIONS,
+    teacherStageDefinitions: TEACHER_STAGE_DEFINITIONS,
   };
 }
 
 module.exports = {
   buildDefaultSimulatorForm,
+  hydrateSimulatorForm,
   buildSimulatorViewModel,
   normalizeSimulatorInput,
   validateSimulatorForm,

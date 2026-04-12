@@ -1,4 +1,4 @@
-<%- include("partials/head", { pageTitle, activeNav, appName, navMode: "predictors-only", bodyClass: "predictor-shell" }) %>
+<%- include("partials/head", { pageTitle, activeNav, appName, navMode: "predictors-only", bodyClass: "predictor-shell", predictorTabs, activePredictorTab }) %>
 
 <%
   const warningLabelMap = {
@@ -7,271 +7,456 @@
     yellow: "黄色",
     green: "绿色",
   };
+
+  function parsePercentDisplay(value) {
+    const parsed = Number(String(value ?? "").replace(/[%％]/g, "").trim());
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function formatPercentDisplay(value) {
+    return `${Number(value || 0).toFixed(2)}%`;
+  }
+
+  function summarizeSlotRows(rows) {
+    const ratioSum = rows.reduce((sum, row) => sum + parsePercentDisplay(row.ratio), 0);
+
+    return {
+      count: rows.length,
+      ratioSum,
+      ratioSumDisplay: formatPercentDisplay(ratioSum),
+      remainingDisplay: formatPercentDisplay(Math.max(0, 100 - ratioSum)),
+    };
+  }
 %>
 
-<section class="card compact-card predictor-tabs-card">
-  <div class="module-tabs prominent-tabs">
-    <% courseTabs.forEach((tab) => { %>
-      <a class="module-tab <%= tab.key === courseMode ? 'is-active' : '' %>" href="<%= tab.href %>"><%= tab.label %></a>
-    <% }) %>
-  </div>
-</section>
-
-<section class="card">
-  <div class="section-heading">
-    <p class="eyebrow">集中输入</p>
-    <h3>预测配置</h3>
-  </div>
-
-  <% if (errorMessage) { %>
-    <p class="notice error"><%= errorMessage %></p>
-  <% } %>
-
-  <form class="stack-form simulator-form" method="post" action="<%= courseMeta.formAction %>">
-    <section class="simulator-block">
-      <div class="section-heading">
-        <p class="eyebrow">区域 A</p>
-        <h3>预测周期</h3>
+<% if (result) { %>
+  <section class="card compact-card recent-result-card">
+    <div class="recent-result-head">
+      <div class="section-heading compact-section-heading">
+        <p class="eyebrow">最近一次预测</p>
+        <h3><%= courseMeta.pageHeading %></h3>
       </div>
-      <div class="simulator-grid simulator-grid-3">
-        <label>
-          <span>开始日期</span>
-          <input name="start_date" type="date" value="<%= simulatorForm.period.startDate %>" required />
-        </label>
-        <label>
-          <span>结束日期</span>
-          <input name="end_date" type="date" value="<%= simulatorForm.period.endDate %>" required />
-        </label>
-        <label>
-          <span>汇总维度</span>
-          <select name="summary_granularity" required>
-            <% summaryGranularityOptions.forEach((option) => { %>
-              <option value="<%= option.value %>" <%= simulatorForm.period.summaryGranularity === option.value ? "selected" : "" %>>
-                <%= option.label %>
-              </option>
-            <% }) %>
-          </select>
-        </label>
+      <button type="button" class="secondary-link recent-result-action" data-show-predictor-settings>重新预测</button>
+    </div>
+    <div class="note-list compact-note-list recent-result-tags">
+      <span class="tag">周期：<%= result.cycleSummary.rangeLabel %></span>
+      <span class="tag">预测周数：<%= result.cycleSummary.weekCount %> 周</span>
+      <span class="tag">当前课程：<%= courseMeta.label %></span>
+    </div>
+    <p class="field-help">页面已按当前已保存配置自动展示最近一次预测结果。点击右侧“重新预测”即可展开设置并重新试算。</p>
+  </section>
+<% } %>
+
+<section
+  class="card compact-card predictor-settings-card"
+  data-predictor-settings-panel
+  <%= result && !showSettingsExpanded ? "hidden" : "" %>
+>
+  <div class="predictor-settings-panel-head">
+    <div>
+      <p class="eyebrow">集中输入</p>
+      <h3>预测设置</h3>
+    </div>
+    <% if (!result) { %>
+      <div class="predictor-settings-meta">
+        <small>填写参数后即可开始预测</small>
       </div>
-      <details class="inline-disclosure">
-        <summary>查看字段说明</summary>
-        <div class="disclosure-body">
-          <p class="field-help">第一版轻量预测器按你选择的预测周期汇总输出；“按周 / 按月”用于记录你的试算口径，不改变当前页面的集中试算方式。</p>
-        </div>
-      </details>
-    </section>
-
-    <% if (courseMode === "trial") { %>
-      <section class="simulator-block">
-        <div class="section-heading">
-          <p class="eyebrow">区域 B</p>
-          <h3>体验课配置</h3>
-        </div>
-        <div class="simulator-grid simulator-grid-4">
-          <label>
-            <span>预测周期分配线索数</span>
-            <input name="trial_assigned_leads" type="number" min="0" step="1" value="<%= simulatorForm.trial.assignedLeads %>" required />
-          </label>
-          <label>
-            <span>预测周期到课率</span>
-            <input name="trial_attend_rate" type="number" min="0" max="1" step="0.01" value="<%= simulatorForm.trial.attendRate %>" required />
-          </label>
-          <label>
-            <span>每班级人数</span>
-            <input name="trial_class_size" type="number" min="1" step="1" value="<%= simulatorForm.trial.classSize %>" required />
-          </label>
-          <label>
-            <span>全职老师数</span>
-            <input name="trial_full_time_teachers" type="number" min="0" step="1" value="<%= simulatorForm.trial.fullTimeTeachers %>" required />
-          </label>
-          <label>
-            <span>全职单师周带班数</span>
-            <input name="trial_full_time_weekly_classes" type="number" min="1" step="1" value="<%= simulatorForm.trial.fullTimeWeeklyClasses %>" required />
-          </label>
-          <label>
-            <span>兼职老师数</span>
-            <input name="trial_part_time_teachers" type="number" min="0" step="1" value="<%= simulatorForm.trial.partTimeTeachers %>" required />
-          </label>
-          <label>
-            <span>兼职单师周带班数</span>
-            <input name="trial_part_time_weekly_classes" type="number" min="0" step="1" value="<%= simulatorForm.trial.partTimeWeeklyClasses %>" required />
-          </label>
-          <label>
-            <span>老师招聘周期（天）</span>
-            <input name="trial_recruitment_days" type="number" min="0" step="1" value="<%= simulatorForm.trial.recruitmentDays %>" required />
-          </label>
-          <label>
-            <span>老师入职培训周期（天）</span>
-            <input name="trial_training_days" type="number" min="0" step="1" value="<%= simulatorForm.trial.trainingDays %>" required />
-          </label>
-        </div>
-
-        <div class="slot-config-card">
-          <div class="section-heading">
-            <p class="eyebrow">热门时段配置</p>
-            <h3>体验课热门时段占比</h3>
-          </div>
-          <div class="slot-rows" data-slot-group="trial">
-            <% simulatorForm.trial.slotRows.forEach((row) => { %>
-              <div class="slot-row">
-                <label>
-                  <span>周几</span>
-                  <select name="trial_slot_day[]" required>
-                    <% weekdayOptions.forEach((option) => { %>
-                      <option value="<%= option.value %>" <%= row.dayOfWeek === option.value ? "selected" : "" %>><%= option.label %></option>
-                    <% }) %>
-                  </select>
-                </label>
-                <label>
-                  <span>开始时间</span>
-                  <input name="trial_slot_start[]" type="time" value="<%= row.startTime %>" required />
-                </label>
-                <label>
-                  <span>结束时间</span>
-                  <input name="trial_slot_end[]" type="time" value="<%= row.endTime %>" required />
-                </label>
-                <label>
-                  <span>占比</span>
-                  <input name="trial_slot_ratio[]" type="number" min="0" max="1" step="0.01" value="<%= row.ratio %>" required />
-                </label>
-                <button type="button" class="danger-button slot-remove-button" data-remove-slot>删除</button>
-              </div>
-            <% }) %>
-          </div>
-          <div class="action-row">
-            <button type="button" class="secondary-link add-slot-button" data-add-slot="trial">新增体验课时段</button>
-          </div>
-          <details class="inline-disclosure">
-            <summary>查看字段说明</summary>
-            <div class="disclosure-body">
-              <p class="field-help">热门时段占比表示“该热门时段班次数占周总班次数的比例”。合计可以小于 1，只要不超过 1 即可；未配置的剩余占比会视为普通时段，当前不单独展开预测。</p>
-              <p class="field-help">轻量版默认假设该课程类型所有老师都可参与这些时段供给，这不是实际排班能力。</p>
-              <p class="field-help">招聘周期和培训周期会一起用于反推招聘提前量。当前轻量版把预测周期开始日视为缺口开始时间，用来判断最晚应在什么时候启动招聘。</p>
-            </div>
-          </details>
-        </div>
-      </section>
-    <% } else { %>
-      <section class="simulator-block">
-        <div class="section-heading">
-          <p class="eyebrow">区域 B</p>
-          <h3>正价课配置</h3>
-        </div>
-        <div class="simulator-grid simulator-grid-4">
-          <label>
-            <span>当前总在课人数</span>
-            <input name="paid_current_students" type="number" min="0" step="1" value="<%= simulatorForm.paid.currentStudents %>" required />
-          </label>
-          <label>
-            <span>其中：本期待续费人数</span>
-            <input name="paid_renewal_due_students" type="number" min="0" step="1" value="<%= simulatorForm.paid.renewalDueStudents %>" required />
-          </label>
-          <label>
-            <span>续费流失率</span>
-            <input name="paid_renewal_churn_rate" type="number" min="0" max="1" step="0.01" value="<%= simulatorForm.paid.renewalChurnRate %>" required />
-          </label>
-          <label>
-            <span>预测周期销售转化入课人数</span>
-            <input name="paid_sales_converted_starts" type="number" min="0" step="1" value="<%= simulatorForm.paid.salesConvertedStarts %>" required />
-          </label>
-          <label>
-            <span>预测周期电商新签入课人数</span>
-            <input name="paid_ecom_starts" type="number" min="0" step="1" value="<%= simulatorForm.paid.ecomStarts %>" required />
-          </label>
-          <label>
-            <span>每生周课次</span>
-            <input name="paid_student_weekly_classes" type="number" min="0" step="0.1" value="<%= simulatorForm.paid.studentWeeklyClasses %>" required />
-          </label>
-          <label>
-            <span>班级人数</span>
-            <input name="paid_class_size" type="number" min="1" step="1" value="<%= simulatorForm.paid.classSize %>" required />
-          </label>
-          <label>
-            <span>全职老师数</span>
-            <input name="paid_full_time_teachers" type="number" min="0" step="1" value="<%= simulatorForm.paid.fullTimeTeachers %>" required />
-          </label>
-          <label>
-            <span>全职单师周带班数</span>
-            <input name="paid_full_time_weekly_classes" type="number" min="1" step="1" value="<%= simulatorForm.paid.fullTimeWeeklyClasses %>" required />
-          </label>
-          <label>
-            <span>兼职老师数</span>
-            <input name="paid_part_time_teachers" type="number" min="0" step="1" value="<%= simulatorForm.paid.partTimeTeachers %>" required />
-          </label>
-          <label>
-            <span>兼职单师周带班数</span>
-            <input name="paid_part_time_weekly_classes" type="number" min="0" step="1" value="<%= simulatorForm.paid.partTimeWeeklyClasses %>" required />
-          </label>
-          <label>
-            <span>老师招聘周期（天）</span>
-            <input name="paid_recruitment_days" type="number" min="0" step="1" value="<%= simulatorForm.paid.recruitmentDays %>" required />
-          </label>
-          <label>
-            <span>老师入职培训周期（天）</span>
-            <input name="paid_training_days" type="number" min="0" step="1" value="<%= simulatorForm.paid.trainingDays %>" required />
-          </label>
-        </div>
-        <details class="inline-disclosure">
-          <summary>查看字段说明</summary>
-          <div class="disclosure-body">
-            <p class="field-help">当前总在课人数默认已包含本期待续费人数，因此轻量版只扣续费流失部分，不再把续费留存人数重复加回。</p>
-          </div>
-        </details>
-
-        <div class="slot-config-card">
-          <div class="section-heading">
-            <p class="eyebrow">热门时段配置</p>
-            <h3>正价课热门时段占比</h3>
-          </div>
-          <div class="slot-rows" data-slot-group="paid">
-            <% simulatorForm.paid.slotRows.forEach((row) => { %>
-              <div class="slot-row">
-                <label>
-                  <span>周几</span>
-                  <select name="paid_slot_day[]" required>
-                    <% weekdayOptions.forEach((option) => { %>
-                      <option value="<%= option.value %>" <%= row.dayOfWeek === option.value ? "selected" : "" %>><%= option.label %></option>
-                    <% }) %>
-                  </select>
-                </label>
-                <label>
-                  <span>开始时间</span>
-                  <input name="paid_slot_start[]" type="time" value="<%= row.startTime %>" required />
-                </label>
-                <label>
-                  <span>结束时间</span>
-                  <input name="paid_slot_end[]" type="time" value="<%= row.endTime %>" required />
-                </label>
-                <label>
-                  <span>占比</span>
-                  <input name="paid_slot_ratio[]" type="number" min="0" max="1" step="0.01" value="<%= row.ratio %>" required />
-                </label>
-                <button type="button" class="danger-button slot-remove-button" data-remove-slot>删除</button>
-              </div>
-            <% }) %>
-          </div>
-          <div class="action-row">
-            <button type="button" class="secondary-link add-slot-button" data-add-slot="paid">新增正价课时段</button>
-          </div>
-          <details class="inline-disclosure">
-            <summary>查看字段说明</summary>
-            <div class="disclosure-body">
-              <p class="field-help">热门时段占比表示“该热门时段班次数占周总班次数的比例”。合计可以小于 1，只要不超过 1 即可；未配置的剩余占比会视为普通时段，当前不单独展开预测。</p>
-              <p class="field-help">轻量版默认假设该课程类型所有老师都可参与这些时段供给，这不是实际排班能力。</p>
-            </div>
-          </details>
-        </div>
-      </section>
+    <% } %>
+  </div>
+  <div class="disclosure-body">
+    <% if (errorMessage) { %>
+      <p class="notice error"><%= errorMessage %></p>
     <% } %>
 
-    <div class="action-row simulator-submit-row">
-      <button type="submit">开始预测</button>
-    </div>
-  </form>
+    <form class="stack-form simulator-form" method="post" action="<%= courseMeta.formAction %>">
+      <section class="simulator-block">
+        <div class="card-header-row">
+          <div class="section-heading compact-section-heading section-heading-compact">
+            <p class="eyebrow">区域 A</p>
+            <h3>预测周期</h3>
+          </div>
+          <div class="card-tools">
+            <details class="inline-disclosure tool-disclosure">
+              <summary>查看字段说明</summary>
+              <div class="disclosure-body">
+                <p class="field-help">第一版轻量预测器按你选择的预测周期汇总输出；“按周 / 按月”用于记录你的试算口径，不改变当前页面的集中试算方式。</p>
+              </div>
+            </details>
+          </div>
+        </div>
+        <div class="simulator-grid simulator-grid-3">
+          <label>
+            <span>开始日期</span>
+            <input name="start_date" type="date" value="<%= simulatorForm.period.startDate %>" required />
+          </label>
+          <label>
+            <span>结束日期</span>
+            <input name="end_date" type="date" value="<%= simulatorForm.period.endDate %>" required />
+          </label>
+          <label>
+            <span>汇总维度</span>
+            <select name="summary_granularity" required>
+              <% summaryGranularityOptions.forEach((option) => { %>
+                <option value="<%= option.value %>" <%= simulatorForm.period.summaryGranularity === option.value ? "selected" : "" %>>
+                  <%= option.label %>
+                </option>
+              <% }) %>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <% if (courseMode === "trial") { %>
+        <% const trialSlotSummary = summarizeSlotRows(simulatorForm.trial.slotRows); %>
+        <section class="simulator-block">
+          <div class="section-heading compact-section-heading">
+            <p class="eyebrow">区域 B</p>
+            <h3>体验课配置</h3>
+          </div>
+          <div class="simulator-grid simulator-grid-4">
+            <label>
+              <span>预测周期分配线索数</span>
+              <input name="trial_assigned_leads" type="number" min="0" step="1" value="<%= simulatorForm.trial.assignedLeads %>" required />
+            </label>
+            <label>
+              <span>预测周期到课率</span>
+              <div class="input-with-suffix">
+                <input name="trial_attend_rate" type="text" inputmode="decimal" value="<%= simulatorForm.trial.attendRate %>" data-percent-input required />
+                <span>%</span>
+              </div>
+            </label>
+            <label>
+              <span>每班级人数</span>
+              <input name="trial_class_size" type="number" min="1" step="1" value="<%= simulatorForm.trial.classSize %>" required />
+            </label>
+            <label>
+              <span>老师招聘周期（天）</span>
+              <input name="trial_recruitment_days" type="number" min="0" step="1" value="<%= simulatorForm.trial.recruitmentDays %>" required />
+            </label>
+            <label>
+              <span>老师入职培训周期（天）</span>
+              <input name="trial_training_days" type="number" min="0" step="1" value="<%= simulatorForm.trial.trainingDays %>" required />
+            </label>
+          </div>
+
+          <div class="teacher-stage-card">
+            <div class="card-header-row">
+              <div class="section-heading compact-section-heading section-heading-compact">
+                <p class="eyebrow">师资配置</p>
+                <h3>体验课师资分阶段配置</h3>
+              </div>
+              <div class="card-tools">
+                <details class="inline-disclosure tool-disclosure">
+                  <summary>查看字段说明</summary>
+                  <div class="disclosure-body">
+                    <p class="field-help">把体验课老师按“全职 / 兼职”与“培训期 / 新手期 / 正式期”拆开填写，系统会按 6 行合计计算总供给班次数。</p>
+                    <p class="field-help">“人数”表示当前这个阶段可参与体验课带班的老师数；“周课次”表示该阶段单个老师单周平均可承接的班次数。</p>
+                  </div>
+                </details>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table teacher-stage-table">
+                <thead>
+                  <tr>
+                    <th>类型</th>
+                    <th>阶段</th>
+                    <th>人数</th>
+                    <th>周课次</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% simulatorForm.trial.teacherRows.forEach((row, index) => { %>
+                    <tr>
+                      <% if (index === 0 || index === 3) { %>
+                        <td rowspan="3" class="teacher-stage-type"><%= row.typeLabel %></td>
+                      <% } %>
+                      <td>
+                        <%= row.stageLabel %>
+                        <input name="trial_teacher_type[]" type="hidden" value="<%= row.typeKey %>" />
+                        <input name="trial_teacher_stage[]" type="hidden" value="<%= row.stageKey %>" />
+                      </td>
+                      <td class="teacher-stage-input-cell">
+                        <input name="trial_teacher_count[]" type="number" min="0" step="1" value="<%= row.teacherCount %>" required />
+                      </td>
+                      <td class="teacher-stage-input-cell">
+                        <input name="trial_teacher_weekly_classes[]" type="number" min="0" step="1" value="<%= row.weeklyClasses %>" required />
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="slot-config-card">
+            <details class="slot-editor" <%= result ? "" : "open" %>>
+              <summary class="slot-config-summary">
+                <div>
+                  <p class="eyebrow">热门时段配置</p>
+                  <h3>体验课热门时段占比</h3>
+                </div>
+                <div class="slot-summary-meta" data-slot-summary-meta="trial">
+                  <span class="tag slot-summary-tag" data-slot-count>已配置 <%= trialSlotSummary.count %> 个时段</span>
+                  <span class="tag slot-summary-tag" data-slot-sum>已配置占比 <%= trialSlotSummary.ratioSumDisplay %></span>
+                  <span class="tag slot-summary-tag" data-slot-remaining>剩余普通时段 <%= trialSlotSummary.remainingDisplay %></span>
+                  <span class="slot-summary-toggle">点击查看/修改配置</span>
+                </div>
+              </summary>
+              <div class="disclosure-body">
+                <details class="inline-disclosure compact-inline-disclosure">
+                  <summary>批量粘贴添加时段</summary>
+                  <div class="disclosure-body">
+                    <p class="field-help">支持每行一条，例如：<strong>周三 18:00-19:00 12.50%</strong>；也支持从 Excel 直接粘贴“周几 / 开始时间 / 结束时间 / 占比”四列。</p>
+                    <textarea class="slot-bulk-input" rows="4" data-slot-bulk-input="trial" placeholder="周三 18:00-19:00 12.50%&#10;周六\t10:00\t11:00\t8.00"></textarea>
+                    <div class="action-row slot-bulk-actions">
+                      <button type="button" class="secondary-link" data-import-slots="trial">追加到时段列表</button>
+                      <span class="field-help">不会覆盖已存在配置。</span>
+                    </div>
+                  </div>
+                </details>
+
+                <div class="slot-rows" data-slot-group="trial">
+                  <% simulatorForm.trial.slotRows.forEach((row) => { %>
+                    <div class="slot-row">
+                      <label>
+                        <span>周几</span>
+                        <select name="trial_slot_day[]" required>
+                          <% weekdayOptions.forEach((option) => { %>
+                            <option value="<%= option.value %>" <%= row.dayOfWeek === option.value ? "selected" : "" %>><%= option.label %></option>
+                          <% }) %>
+                        </select>
+                      </label>
+                      <label>
+                        <span>开始时间</span>
+                        <input name="trial_slot_start[]" type="time" value="<%= row.startTime %>" required />
+                      </label>
+                      <label>
+                        <span>结束时间</span>
+                        <input name="trial_slot_end[]" type="time" value="<%= row.endTime %>" required />
+                      </label>
+                      <label>
+                        <span>占比</span>
+                        <div class="input-with-suffix">
+                          <input name="trial_slot_ratio[]" type="text" inputmode="decimal" value="<%= row.ratio %>" data-percent-input required />
+                          <span>%</span>
+                        </div>
+                      </label>
+                      <button type="button" class="danger-button slot-remove-button" data-remove-slot>删除</button>
+                    </div>
+                  <% }) %>
+                </div>
+
+                <div class="action-row">
+                  <button type="button" class="secondary-link add-slot-button" data-add-slot="trial">新增体验课时段</button>
+                </div>
+                <div class="card-tools card-tools-inline">
+                  <details class="inline-disclosure tool-disclosure">
+                    <summary>查看字段说明</summary>
+                    <div class="disclosure-body">
+                      <p class="field-help">热门时段占比表示“该热门时段班次数占周总班次数的比例”。合计可以小于 100%，只要不超过 100% 即可；未配置的剩余占比会视为普通时段，当前不单独展开预测。</p>
+                      <p class="field-help">轻量版默认假设该课程类型所有老师都可参与这些时段供给，这不是实际排班能力。</p>
+                      <p class="field-help">招聘周期和培训周期会一起用于反推招聘提前量。当前轻量版把预测周期开始日视为缺口开始时间，用来判断最晚应在什么时候启动招聘。</p>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
+      <% } else { %>
+        <% const paidSlotSummary = summarizeSlotRows(simulatorForm.paid.slotRows); %>
+        <section class="simulator-block">
+          <div class="card-header-row">
+            <div class="section-heading compact-section-heading section-heading-compact">
+              <p class="eyebrow">区域 B</p>
+              <h3>正价课配置</h3>
+            </div>
+            <div class="card-tools">
+              <details class="inline-disclosure tool-disclosure">
+                <summary>查看字段说明</summary>
+                <div class="disclosure-body">
+                  <p class="field-help">当前总在课人数默认已包含本期待续费人数，因此轻量版只扣续费流失部分，不再把续费留存人数重复加回。</p>
+                </div>
+              </details>
+            </div>
+          </div>
+          <div class="simulator-grid simulator-grid-4">
+            <label>
+              <span>当前总在课人数</span>
+              <input name="paid_current_students" type="number" min="0" step="1" value="<%= simulatorForm.paid.currentStudents %>" required />
+            </label>
+            <label>
+              <span>其中：本期待续费人数</span>
+              <input name="paid_renewal_due_students" type="number" min="0" step="1" value="<%= simulatorForm.paid.renewalDueStudents %>" required />
+            </label>
+            <label>
+              <span>续费流失率</span>
+              <div class="input-with-suffix">
+                <input name="paid_renewal_churn_rate" type="text" inputmode="decimal" value="<%= simulatorForm.paid.renewalChurnRate %>" data-percent-input required />
+                <span>%</span>
+              </div>
+            </label>
+            <label>
+              <span>预测周期销售转化入课人数</span>
+              <input name="paid_sales_converted_starts" type="number" min="0" step="1" value="<%= simulatorForm.paid.salesConvertedStarts %>" required />
+            </label>
+            <label>
+              <span>预测周期电商新签入课人数</span>
+              <input name="paid_ecom_starts" type="number" min="0" step="1" value="<%= simulatorForm.paid.ecomStarts %>" required />
+            </label>
+            <label>
+              <span>每生周课次</span>
+              <input name="paid_student_weekly_classes" type="number" min="0" step="0.1" value="<%= simulatorForm.paid.studentWeeklyClasses %>" required />
+            </label>
+            <label>
+              <span>班级人数</span>
+              <input name="paid_class_size" type="number" min="1" step="1" value="<%= simulatorForm.paid.classSize %>" required />
+            </label>
+            <label>
+              <span>老师招聘周期（天）</span>
+              <input name="paid_recruitment_days" type="number" min="0" step="1" value="<%= simulatorForm.paid.recruitmentDays %>" required />
+            </label>
+            <label>
+              <span>老师入职培训周期（天）</span>
+              <input name="paid_training_days" type="number" min="0" step="1" value="<%= simulatorForm.paid.trainingDays %>" required />
+            </label>
+          </div>
+          <div class="teacher-stage-card">
+            <div class="card-header-row">
+              <div class="section-heading compact-section-heading section-heading-compact">
+                <p class="eyebrow">师资配置</p>
+                <h3>正价课师资分阶段配置</h3>
+              </div>
+              <div class="card-tools">
+                <details class="inline-disclosure tool-disclosure">
+                  <summary>查看字段说明</summary>
+                  <div class="disclosure-body">
+                    <p class="field-help">把正价课老师按“全职 / 兼职”与“培训期 / 新手期 / 正式期”拆开填写，系统会按 6 行合计计算总供给班次数。</p>
+                    <p class="field-help">“人数”表示当前这个阶段可参与正价课带班的老师数；“周课次”表示该阶段单个老师单周平均可承接的班次数。</p>
+                  </div>
+                </details>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table teacher-stage-table">
+                <thead>
+                  <tr>
+                    <th>类型</th>
+                    <th>阶段</th>
+                    <th>人数</th>
+                    <th>周课次</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% simulatorForm.paid.teacherRows.forEach((row, index) => { %>
+                    <tr>
+                      <% if (index === 0 || index === 3) { %>
+                        <td rowspan="3" class="teacher-stage-type"><%= row.typeLabel %></td>
+                      <% } %>
+                      <td>
+                        <%= row.stageLabel %>
+                        <input name="paid_teacher_type[]" type="hidden" value="<%= row.typeKey %>" />
+                        <input name="paid_teacher_stage[]" type="hidden" value="<%= row.stageKey %>" />
+                      </td>
+                      <td class="teacher-stage-input-cell">
+                        <input name="paid_teacher_count[]" type="number" min="0" step="1" value="<%= row.teacherCount %>" required />
+                      </td>
+                      <td class="teacher-stage-input-cell">
+                        <input name="paid_teacher_weekly_classes[]" type="number" min="0" step="1" value="<%= row.weeklyClasses %>" required />
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="slot-config-card">
+            <details class="slot-editor" <%= result ? "" : "open" %>>
+              <summary class="slot-config-summary">
+                <div>
+                  <p class="eyebrow">热门时段配置</p>
+                  <h3>正价课热门时段占比</h3>
+                </div>
+                <div class="slot-summary-meta" data-slot-summary-meta="paid">
+                  <span class="tag slot-summary-tag" data-slot-count>已配置 <%= paidSlotSummary.count %> 个时段</span>
+                  <span class="tag slot-summary-tag" data-slot-sum>已配置占比 <%= paidSlotSummary.ratioSumDisplay %></span>
+                  <span class="tag slot-summary-tag" data-slot-remaining>剩余普通时段 <%= paidSlotSummary.remainingDisplay %></span>
+                  <span class="slot-summary-toggle">点击查看/修改配置</span>
+                </div>
+              </summary>
+              <div class="disclosure-body">
+                <details class="inline-disclosure compact-inline-disclosure">
+                  <summary>批量粘贴添加时段</summary>
+                  <div class="disclosure-body">
+                    <p class="field-help">支持每行一条，例如：<strong>周四 19:00-20:00 10.00%</strong>；也支持从 Excel 直接粘贴“周几 / 开始时间 / 结束时间 / 占比”四列。</p>
+                    <textarea class="slot-bulk-input" rows="4" data-slot-bulk-input="paid" placeholder="周二 19:00-20:00 12.50%&#10;周六\t09:00\t10:00\t8.00"></textarea>
+                    <div class="action-row slot-bulk-actions">
+                      <button type="button" class="secondary-link" data-import-slots="paid">追加到时段列表</button>
+                      <span class="field-help">不会覆盖已存在配置。</span>
+                    </div>
+                  </div>
+                </details>
+
+                <div class="slot-rows" data-slot-group="paid">
+                  <% simulatorForm.paid.slotRows.forEach((row) => { %>
+                    <div class="slot-row">
+                      <label>
+                        <span>周几</span>
+                        <select name="paid_slot_day[]" required>
+                          <% weekdayOptions.forEach((option) => { %>
+                            <option value="<%= option.value %>" <%= row.dayOfWeek === option.value ? "selected" : "" %>><%= option.label %></option>
+                          <% }) %>
+                        </select>
+                      </label>
+                      <label>
+                        <span>开始时间</span>
+                        <input name="paid_slot_start[]" type="time" value="<%= row.startTime %>" required />
+                      </label>
+                      <label>
+                        <span>结束时间</span>
+                        <input name="paid_slot_end[]" type="time" value="<%= row.endTime %>" required />
+                      </label>
+                      <label>
+                        <span>占比</span>
+                        <div class="input-with-suffix">
+                          <input name="paid_slot_ratio[]" type="text" inputmode="decimal" value="<%= row.ratio %>" data-percent-input required />
+                          <span>%</span>
+                        </div>
+                      </label>
+                      <button type="button" class="danger-button slot-remove-button" data-remove-slot>删除</button>
+                    </div>
+                  <% }) %>
+                </div>
+
+                <div class="action-row">
+                  <button type="button" class="secondary-link add-slot-button" data-add-slot="paid">新增正价课时段</button>
+                </div>
+                <div class="card-tools card-tools-inline">
+                  <details class="inline-disclosure tool-disclosure">
+                    <summary>查看字段说明</summary>
+                    <div class="disclosure-body">
+                      <p class="field-help">热门时段占比表示“该热门时段班次数占周总班次数的比例”。合计可以小于 100%，只要不超过 100% 即可；未配置的剩余占比会视为普通时段，当前不单独展开预测。</p>
+                      <p class="field-help">轻量版默认假设该课程类型所有老师都可参与这些时段供给，这不是实际排班能力。</p>
+                    </div>
+                  </details>
+                </div>
+              </div>
+            </details>
+          </div>
+        </section>
+      <% } %>
+
+      <div class="action-row simulator-submit-row">
+        <button type="submit">开始预测</button>
+      </div>
+    </form>
+  </div>
 </section>
 
 <% if (result) { %>
-  <section id="results-anchor" class="result-grid">
+  <section class="result-grid">
     <article class="card result-card">
       <div class="section-heading">
         <p class="eyebrow">核心结论</p>
@@ -317,33 +502,45 @@
       <p class="result-note"><%= result[courseMode].hiringMessage %></p>
     </article>
   </section>
+<% } %>
 
+<% if (result) { %>
   <section class="content-grid single-column">
     <article class="card">
-      <div class="section-heading">
-        <p class="eyebrow">整体结果</p>
-        <h3><%= courseMeta.resultTitle %></h3>
+      <div class="card-header-row">
+        <div class="section-heading section-heading-compact">
+          <p class="eyebrow">整体结果</p>
+          <h3><%= courseMeta.resultTitle %></h3>
+        </div>
+        <div class="card-tools">
+          <% if (courseMode === "trial") { %>
+            <details class="inline-disclosure tool-disclosure">
+              <summary>查看字段说明</summary>
+              <div class="disclosure-body">
+                <p class="field-help">需求班次数：按“预计到课人数 ÷ 每班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再乘以预测周期周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
+                <p class="field-help">当前已展开的热门时段占比为 <strong><%= result.trial.slotRatioSumDisplay %></strong>，其余 <strong><%= result.trial.remainingOrdinaryRatioDisplay %></strong> 视为普通时段，当前不单独展开预测。</p>
+                <p class="field-help">招聘提前量按“缺口开始时间 -（招聘周期 + 培训周期）”反推。当前轻量版把预测周期开始日作为缺口开始时间，用于判断最晚启动招聘的时间点。</p>
+              </div>
+            </details>
+          <% } else { %>
+            <details class="inline-disclosure tool-disclosure">
+              <summary>查看字段说明</summary>
+              <div class="disclosure-body">
+                <p class="field-help">预计正价承载人数 = 当前在课底盘 - 续费流失人数 + 预测新增入课人数。本页默认“当前总在课人数”已经包含本期待续费人数。</p>
+                <p class="field-help">需求班次数：按“预计承载学员数 × 每生周课次 × 预测周期周数 ÷ 班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再乘以预测周期周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
+                <p class="field-help">当前已展开的热门时段占比为 <strong><%= result.paid.slotRatioSumDisplay %></strong>，其余 <strong><%= result.paid.remainingOrdinaryRatioDisplay %></strong> 视为普通时段，当前不单独展开预测。</p>
+                <p class="field-help">招聘提前量按“缺口开始时间 -（招聘周期 + 培训周期）”反推。当前轻量版把预测周期开始日作为缺口开始时间，用于判断最晚启动招聘的时间点。</p>
+              </div>
+            </details>
+            <details class="inline-disclosure tool-disclosure">
+              <summary>查看拆解说明</summary>
+              <div class="disclosure-body">
+                <p class="field-help">本次试算中：续费流失人数为 <strong><%= result.paid.renewalLostStudents %></strong>，预测新增入课人数为 <strong><%= result.paid.newProjectedStarts %></strong>。</p>
+              </div>
+            </details>
+          <% } %>
+        </div>
       </div>
-      <% if (courseMode === "trial") { %>
-        <details class="inline-disclosure">
-          <summary>查看字段说明</summary>
-          <div class="disclosure-body">
-            <p class="field-help">需求班次数：按“预计到课人数 ÷ 每班级人数”向上取整。供给班次数：按预测周期内全职和兼职老师可承接的总班次数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，按全职单师周带班数折算。</p>
-            <p class="field-help">当前已展开的热门时段占比为 <strong><%= result.trial.slotRatioSum %></strong>，其余 <strong><%= result.trial.remainingOrdinaryRatio %></strong> 视为普通时段，当前不单独展开预测。</p>
-            <p class="field-help">招聘提前量按“缺口开始时间 -（招聘周期 + 培训周期）”反推。当前轻量版把预测周期开始日作为缺口开始时间，用于判断最晚启动招聘的时间点。</p>
-          </div>
-        </details>
-      <% } else { %>
-        <details class="inline-disclosure">
-          <summary>查看字段说明</summary>
-          <div class="disclosure-body">
-            <p class="field-help">预计正价承载人数 = 当前在课底盘 - 续费流失人数 + 预测新增入课人数。本页默认“当前总在课人数”已经包含本期待续费人数。</p>
-            <p class="field-help">需求班次数：按“预计承载学员数 × 每生周课次 × 预测周期周数 ÷ 班级人数”向上取整。供给班次数：按预测周期内全职和兼职老师可承接的总班次数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，按全职单师周带班数折算。</p>
-            <p class="field-help">当前已展开的热门时段占比为 <strong><%= result.paid.slotRatioSum %></strong>，其余 <strong><%= result.paid.remainingOrdinaryRatio %></strong> 视为普通时段，当前不单独展开预测。</p>
-            <p class="field-help">招聘提前量按“缺口开始时间 -（招聘周期 + 培训周期）”反推。当前轻量版把预测周期开始日作为缺口开始时间，用于判断最晚启动招聘的时间点。</p>
-          </div>
-        </details>
-      <% } %>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
@@ -384,33 +581,30 @@
           </tbody>
         </table>
       </div>
-      <% if (courseMode === "paid") { %>
-        <details class="inline-disclosure">
-          <summary>查看拆解说明</summary>
-          <div class="disclosure-body">
-            <p class="field-help">本次试算中：续费流失人数为 <strong><%= result.paid.renewalLostStudents %></strong>，预测新增入课人数为 <strong><%= result.paid.newProjectedStarts %></strong>。</p>
-          </div>
-        </details>
-      <% } %>
     </article>
 
     <article class="card">
-      <div class="section-heading">
-        <p class="eyebrow">热门时段结果</p>
-        <h3><%= courseMeta.slotTitle %></h3>
-      </div>
-      <details class="inline-disclosure">
-        <summary>查看字段说明</summary>
-        <div class="disclosure-body">
-          <p class="field-help">周均需求老师数：先把整个预测周期总需求班次数折算成周均需求，再乘以该热门时段占比向上取整。时段供给老师数：轻量版按“该课程类型所有老师都可参与该时段供给”快速试算。时段缺口老师数：当供给小于需求时，按差额直接计算。</p>
+      <div class="card-header-row">
+        <div class="section-heading section-heading-compact">
+          <p class="eyebrow">热门时段结果</p>
+          <h3><%= courseMeta.slotTitle %></h3>
         </div>
-      </details>
+        <div class="card-tools">
+          <details class="inline-disclosure tool-disclosure">
+            <summary>查看字段说明</summary>
+            <div class="disclosure-body">
+              <p class="field-help">周均需求老师数：先把整个预测周期总需求班次数折算成周均需求，再乘以该热门时段占比向上取整。时段供给老师数：轻量版按“该课程类型所有老师都可参与该时段供给”快速试算。时段缺口老师数：当供给小于需求时，按差额直接计算。</p>
+            </div>
+          </details>
+        </div>
+      </div>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
             <tr>
               <th>周几</th>
               <th>时段</th>
+              <th>占比</th>
               <th>周均需求老师数</th>
               <th>时段供给老师数</th>
               <th>时段缺口老师数</th>
@@ -423,6 +617,7 @@
               <tr>
                 <td><%= row.dayOfWeek %></td>
                 <td><%= row.timeRange %></td>
+                <td><%= row.ratioDisplay %></td>
                 <td><%= row.requiredTeachers %></td>
                 <td><%= row.availableTeachers %></td>
                 <td><%= row.shortageTeacherCount %></td>
@@ -478,7 +673,10 @@
     </label>
     <label>
       <span>占比</span>
-      <input data-slot-field="ratio" type="number" min="0" max="1" step="0.01" value="0.10" required />
+      <div class="input-with-suffix">
+        <input data-slot-field="ratio" type="text" inputmode="decimal" value="10.00" data-percent-input required />
+        <span>%</span>
+      </div>
     </label>
     <button type="button" class="danger-button slot-remove-button" data-remove-slot>删除</button>
   </div>
@@ -486,14 +684,153 @@
 
 <script>
   (() => {
+    const settingsPanel = document.querySelector("[data-predictor-settings-panel]");
+    const showSettingsButton = document.querySelector("[data-show-predictor-settings]");
     const template = document.getElementById("slot-row-template");
     const form = document.querySelector('form[action^="/forecast/simulator/"]');
-    const resultsAnchor = document.getElementById("results-anchor");
+
+    function setupHoverDisclosures() {
+      const supportsHover = () => window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+
+      document.querySelectorAll(".tool-disclosure").forEach((disclosure) => {
+        if (disclosure.dataset.hoverReady === "true") {
+          return;
+        }
+
+        disclosure.dataset.hoverReady = "true";
+        const summary = disclosure.querySelector("summary");
+
+        if (!summary) {
+          return;
+        }
+
+        let closeTimer;
+
+        function openDisclosure() {
+          window.clearTimeout(closeTimer);
+          document.querySelectorAll(".tool-disclosure[open]").forEach((item) => {
+            if (item !== disclosure) {
+              item.open = false;
+            }
+          });
+          disclosure.open = true;
+        }
+
+        function closeDisclosure(withDelay = false) {
+          window.clearTimeout(closeTimer);
+
+          if (!withDelay) {
+            disclosure.open = false;
+            return;
+          }
+
+          closeTimer = window.setTimeout(() => {
+            disclosure.open = false;
+          }, 90);
+        }
+
+        disclosure.addEventListener("mouseenter", () => {
+          if (supportsHover()) {
+            openDisclosure();
+          }
+        });
+
+        disclosure.addEventListener("mouseleave", () => {
+          if (supportsHover()) {
+            closeDisclosure(true);
+          }
+        });
+
+        disclosure.addEventListener("focusin", openDisclosure);
+        disclosure.addEventListener("focusout", (event) => {
+          if (!disclosure.contains(event.relatedTarget)) {
+            closeDisclosure();
+          }
+        });
+
+        summary.addEventListener("click", (event) => {
+          event.preventDefault();
+
+          if (supportsHover()) {
+            openDisclosure();
+            return;
+          }
+
+          disclosure.open = !disclosure.open;
+        });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (event.target.closest(".tool-disclosure")) {
+          return;
+        }
+
+        document.querySelectorAll(".tool-disclosure[open]").forEach((disclosure) => {
+          disclosure.open = false;
+        });
+      });
+    }
+
+    if (showSettingsButton && settingsPanel) {
+      showSettingsButton.addEventListener("click", () => {
+        settingsPanel.hidden = false;
+        settingsPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+
+    setupHoverDisclosures();
+
+    function parsePercentValue(rawValue) {
+      const parsed = Number(String(rawValue ?? "").trim().replace(/[%％]/g, ""));
+      return Number.isFinite(parsed) ? parsed : NaN;
+    }
+
+    function formatPercentInput(input) {
+      if (!input) {
+        return;
+      }
+
+      const value = parsePercentValue(input.value);
+
+      if (Number.isFinite(value)) {
+        input.value = value.toFixed(2);
+      }
+    }
 
     function getRatioInputs(group) {
       return Array.from(
         document.querySelectorAll(`.slot-rows[data-slot-group="${group}"] input[name="${group}_slot_ratio[]"]`)
       );
+    }
+
+    function updateSlotSummary(group) {
+      const summary = document.querySelector(`[data-slot-summary-meta="${group}"]`);
+
+      if (!summary) {
+        return;
+      }
+
+      const inputs = getRatioInputs(group);
+      const ratioSum = inputs.reduce((sum, input) => {
+        const value = parsePercentValue(input.value);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
+
+      const countEl = summary.querySelector("[data-slot-count]");
+      const sumEl = summary.querySelector("[data-slot-sum]");
+      const remainingEl = summary.querySelector("[data-slot-remaining]");
+
+      if (countEl) {
+        countEl.textContent = `已配置 ${inputs.length} 个时段`;
+      }
+
+      if (sumEl) {
+        sumEl.textContent = `已配置占比 ${ratioSum.toFixed(2)}%`;
+      }
+
+      if (remainingEl) {
+        remainingEl.textContent = `剩余普通时段 ${Math.max(0, 100 - ratioSum).toFixed(2)}%`;
+      }
     }
 
     function clearRatioValidity(group) {
@@ -502,12 +839,15 @@
 
     function validateRatioGroup(group, label) {
       const inputs = getRatioInputs(group);
-      const ratioSum = inputs.reduce((sum, input) => sum + Number(input.value || 0), 0);
+      const ratioSum = inputs.reduce((sum, input) => {
+        const value = parsePercentValue(input.value);
+        return sum + (Number.isFinite(value) ? value : 0);
+      }, 0);
 
       clearRatioValidity(group);
 
-      if (ratioSum > 1.000001 && inputs[0]) {
-        const message = `${label}热门时段占比合计不能超过 1，当前为 ${ratioSum.toFixed(2)}。未配置的剩余占比会视为普通时段。`;
+      if (ratioSum > 100.000001 && inputs[0]) {
+        const message = `${label}热门时段占比合计不能超过 100%，当前为 ${ratioSum.toFixed(2)}%。未配置的剩余占比会视为普通时段。`;
         inputs[0].setCustomValidity(message);
         inputs[0].reportValidity();
         return false;
@@ -523,26 +863,137 @@
         row.querySelector('[data-slot-field="end"], input[name$="slot_end[]"]').setAttribute("name", `${prefix}_slot_end[]`);
         row.querySelector('[data-slot-field="ratio"], input[name$="slot_ratio[]"]').setAttribute("name", `${prefix}_slot_ratio[]`);
       });
+
+      updateSlotSummary(prefix);
+    }
+
+    function appendSlotRow(group, rowData = {}) {
+      const container = document.querySelector(`.slot-rows[data-slot-group="${group}"]`);
+
+      if (!container) {
+        return;
+      }
+
+      const fragment = template.content.cloneNode(true);
+      const tempWrapper = document.createElement("div");
+      tempWrapper.appendChild(fragment);
+      const row = tempWrapper.firstElementChild;
+
+      row.querySelector('[data-slot-field="day"]').value = rowData.dayOfWeek || "周一";
+      row.querySelector('[data-slot-field="start"]').value = rowData.startTime || "";
+      row.querySelector('[data-slot-field="end"]').value = rowData.endTime || "";
+      row.querySelector('[data-slot-field="ratio"]').value = Number.isFinite(parsePercentValue(rowData.ratio))
+        ? parsePercentValue(rowData.ratio).toFixed(2)
+        : "10.00";
+
+      container.appendChild(row);
+      bindSlotNames(container, group);
+      formatPercentInput(row.querySelector('[data-slot-field="ratio"]'));
+    }
+
+    function parseBulkRow(line) {
+      const normalizedLine = line.trim();
+
+      if (!normalizedLine) {
+        return null;
+      }
+
+      const tabParts = normalizedLine.split("\t").map((part) => part.trim()).filter(Boolean);
+      if (tabParts.length >= 4) {
+        return {
+          dayOfWeek: tabParts[0],
+          startTime: tabParts[1],
+          endTime: tabParts[2],
+          ratio: tabParts[3],
+        };
+      }
+
+      const commaParts = normalizedLine.split(/[，,]/).map((part) => part.trim()).filter(Boolean);
+      if (commaParts.length >= 4) {
+        return {
+          dayOfWeek: commaParts[0],
+          startTime: commaParts[1],
+          endTime: commaParts[2],
+          ratio: commaParts[3],
+        };
+      }
+
+      const match = normalizedLine.match(/^(周[一二三四五六日])\s+(\d{2}:\d{2})\s*[-~—至]+\s*(\d{2}:\d{2})\s+([0-9]+(?:\.[0-9]+)?%?)$/);
+
+      if (!match) {
+        return null;
+      }
+
+      return {
+        dayOfWeek: match[1],
+        startTime: match[2],
+        endTime: match[3],
+        ratio: match[4],
+      };
     }
 
     document.querySelectorAll(".slot-rows").forEach((container) => {
       bindSlotNames(container, container.dataset.slotGroup);
     });
 
+    document.querySelectorAll("[data-percent-input]").forEach((input) => {
+      formatPercentInput(input);
+    });
+
     document.querySelectorAll("[data-add-slot]").forEach((button) => {
       button.addEventListener("click", () => {
-        const group = button.dataset.addSlot;
-        const container = document.querySelector(`.slot-rows[data-slot-group="${group}"]`);
-        const fragment = template.content.cloneNode(true);
-        const tempWrapper = document.createElement("div");
-        tempWrapper.appendChild(fragment);
-        const row = tempWrapper.firstElementChild;
-        container.appendChild(row);
-        bindSlotNames(container, group);
+        appendSlotRow(button.dataset.addSlot);
+      });
+    });
+
+    document.querySelectorAll("[data-import-slots]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const group = button.dataset.importSlots;
+        const textarea = document.querySelector(`[data-slot-bulk-input="${group}"]`);
+
+        if (!textarea) {
+          return;
+        }
+
+        const lines = textarea.value.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+
+        if (lines.length === 0) {
+          return;
+        }
+
+        const parsedRows = [];
+        const invalidLines = [];
+
+        lines.forEach((line, index) => {
+          const row = parseBulkRow(line);
+
+          if (!row) {
+            invalidLines.push(index + 1);
+            return;
+          }
+
+          parsedRows.push(row);
+        });
+
+        if (invalidLines.length > 0) {
+          window.alert(`以下行格式无法识别，请检查后重试：第 ${invalidLines.join("、")} 行。`);
+          return;
+        }
+
+        parsedRows.forEach((row) => appendSlotRow(group, row));
+        textarea.value = "";
       });
     });
 
     document.addEventListener("click", (event) => {
+      const staticSummaryTag = event.target.closest(".slot-summary-tag");
+
+      if (staticSummaryTag) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
       const button = event.target.closest("[data-remove-slot]");
 
       if (!button) {
@@ -556,34 +1007,56 @@
         return;
       }
 
+      const group = container.dataset.slotGroup;
       row.remove();
+      bindSlotNames(container, group);
+      clearRatioValidity(group);
     });
 
     document.addEventListener("input", (event) => {
+      if (!event.target.matches('input[name="trial_slot_ratio[]"], input[name="paid_slot_ratio[]"], [data-percent-input]')) {
+        return;
+      }
+
       if (event.target.matches('input[name="trial_slot_ratio[]"]')) {
         clearRatioValidity("trial");
+        updateSlotSummary("trial");
       }
 
       if (event.target.matches('input[name="paid_slot_ratio[]"]')) {
         clearRatioValidity("paid");
+        updateSlotSummary("paid");
       }
     });
 
+    document.addEventListener("blur", (event) => {
+      if (!event.target.matches("[data-percent-input]")) {
+        return;
+      }
+
+      formatPercentInput(event.target);
+
+      if (event.target.matches('input[name="trial_slot_ratio[]"]')) {
+        updateSlotSummary("trial");
+      }
+
+      if (event.target.matches('input[name="paid_slot_ratio[]"]')) {
+        updateSlotSummary("paid");
+      }
+    }, true);
+
     if (form) {
       form.addEventListener("submit", (event) => {
+        document.querySelectorAll("[data-percent-input]").forEach((input) => {
+          formatPercentInput(input);
+        });
+
         const trialOk = validateRatioGroup("trial", "体验课");
         const paidOk = validateRatioGroup("paid", "正价课");
 
         if (!trialOk || !paidOk) {
           event.preventDefault();
-          return;
         }
-      });
-    }
-
-    if (resultsAnchor) {
-      window.requestAnimationFrame(() => {
-        resultsAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
       });
     }
   })();

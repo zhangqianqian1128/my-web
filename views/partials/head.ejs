@@ -4,6 +4,8 @@
   var appName = typeof appName !== 'undefined' ? appName : ''
   var bodyClass = typeof bodyClass !== 'undefined' ? bodyClass : ''
   var navMode = typeof navMode !== 'undefined' ? navMode : ''
+  var predictorTabs = typeof predictorTabs !== 'undefined' ? predictorTabs : []
+  var activePredictorTab = typeof activePredictorTab !== 'undefined' ? activePredictorTab : ''
 %>
 
 <!DOCTYPE html>
@@ -21,10 +23,11 @@
           <p class="eyebrow">独立测算系统</p>
           <h1 class="brand"><%= appName %></h1>
         </div>
-        <nav class="nav">
+        <nav class="nav <%= navMode === 'predictors-only' ? 'predictor-nav' : '' %>">
           <% if (navMode === "predictors-only") { %>
-            <a class="<%= activeNav === 'simulator' ? 'is-active' : '' %>" href="/forecast/simulator/trial">师资预警</a>
-            <a class="<%= activeNav === 'headteacher-simulator' ? 'is-active' : '' %>" href="/forecast/headteacher-simulator">班主任预警</a>
+            <% predictorTabs.forEach((tab) => { %>
+              <a class="<%= tab.key === activePredictorTab ? 'is-active' : '' %>" href="<%= tab.href %>"><%= tab.label %></a>
+            <% }) %>
           <% } else { %>
             <a class="<%= activeNav === 'dashboard' ? 'is-active' : '' %>" href="/">总览</a>
             <a class="<%= activeNav === 'teachers' ? 'is-active' : '' %>" href="/teachers/manage">教师档案</a>
