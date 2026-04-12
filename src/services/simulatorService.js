@@ -82,6 +82,16 @@ function formatFixed(value, digits = 2) {
   return roundTo(value, digits).toFixed(digits);
 }
 
+function formatCount(value, digits = 2) {
+  const roundedValue = roundTo(value, digits);
+
+  if (Number.isInteger(roundedValue)) {
+    return String(roundedValue);
+  }
+
+  return roundedValue.toFixed(digits).replace(/\.?0+$/, "");
+}
+
 function normalizePercentString(value, fallback = "0.00", options = {}) {
   const rawValue = String(value ?? "").trim().replace(/[%％]/g, "");
 
@@ -963,6 +973,28 @@ function buildStaffingSuggestion(shortageTeacherCount, teacherRows) {
   };
 }
 
+function computeShortageTeacherMetrics(gapClasses, shortageTeacherBaseline) {
+  if (gapClasses >= 0) {
+    return {
+      shortageTeacherCount: 0,
+      shortageTeacherCountDisplay: "0",
+      recommendedShortageTeacherCount: 0,
+      hasRoundedRecommendation: false,
+    };
+  }
+
+  const baseline = Math.max(1, Number(shortageTeacherBaseline) || 0);
+  const shortageTeacherCount = roundTo(Math.abs(gapClasses) / baseline, 2);
+  const recommendedShortageTeacherCount = Math.ceil(shortageTeacherCount);
+
+  return {
+    shortageTeacherCount,
+    shortageTeacherCountDisplay: formatCount(shortageTeacherCount, 2),
+    recommendedShortageTeacherCount,
+    hasRoundedRecommendation: !Number.isInteger(shortageTeacherCount),
+  };
+}
+
 function validateSimulatorForm(form, courseMode = "all") {
   if (!isValidDateString(form.period.startDate) || !isValidDateString(form.period.endDate)) {
     return "预测周期的开始日期和结束日期必须是有效日期。";
@@ -1046,14 +1078,26 @@ function validateSimulatorForm(form, courseMode = "all") {
   return "";
 }
 
-function buildOverallWarningMessage(type, warningLevel, shortageTeacherCount, gapClasses) {
+function buildOverallWarningMessage(
+  type,
+  warningLevel,
+  shortageTeacherCount,
+  recommendedShortageTeacherCount,
+  gapClasses
+) {
   const missingClasses = Math.abs(Number(gapClasses || 0));
   const missingClassesDisplay = Number.isInteger(missingClasses)
     ? String(missingClasses)
     : formatFixed(missingClasses, 2);
 
   if (warningLevel === "red") {
-    return `${type}师资不足，预计缺 ${shortageTeacherCount} 名老师，缺口 ${missingClassesDisplay} 个班次`;
+    const shortageTeacherCountDisplay = formatCount(shortageTeacherCount, 2);
+    const recommendationText =
+      recommendedShortageTeacherCount > 0 && !Number.isInteger(shortageTeacherCount)
+        ? `，建议按 ${recommendedShortageTeacherCount} 名储备`
+        : "";
+
+    return `${type}师资不足，折算缺口约 ${shortageTeacherCountDisplay} 名老师${recommendationText}，缺口 ${missingClassesDisplay} 个班次`;
   }
 
   if (warningLevel === "orange") {
@@ -1202,10 +1246,10 @@ function calculateSimulatorResults(form) {
   const trialSlotRatioSum = sumSlotRatios(form.trial.slotRows);
   const trialUtilization = safeDivide(trialRequiredClasses, trialSupplyClasses);
   const trialWarningLevel = getUtilizationWarningLevel(trialUtilization);
-  const trialGapTeachers =
-    trialGapClasses >= 0
-      ? 0
-      : Math.ceil(Math.abs(trialGapClasses) / trialTeacherSummary.shortageTeacherBaseline);
+  const trialShortageMetrics = computeShortageTeacherMetrics(
+    trialGapClasses,
+    trialTeacherSummary.shortageTeacherBaseline
+  );
 
   const paidCurrentStudents = Number(form.paid.currentStudents);
   const paidRenewalDueStudents = Number(form.paid.renewalDueStudents);
@@ -1237,10 +1281,10 @@ function calculateSimulatorResults(form) {
   const paidSlotRatioSum = sumSlotRatios(form.paid.slotRows);
   const paidUtilization = safeDivide(paidRequiredClasses, paidSupplyClasses);
   const paidWarningLevel = getUtilizationWarningLevel(paidUtilization);
-  const paidGapTeachers =
-    paidGapClasses >= 0
-      ? 0
-      : Math.ceil(Math.abs(paidGapClasses) / paidTeacherSummary.shortageTeacherBaseline);
+  const paidShortageMetrics = computeShortageTeacherMetrics(
+    paidGapClasses,
+    paidTeacherSummary.shortageTeacherBaseline
+  );
 
   const trialSlotRows = computeSlotRows(
     "体验课",
@@ -1264,8 +1308,14 @@ function calculateSimulatorResults(form) {
   const paidLeadDays = paidRecruitmentDays + paidTrainingDays;
   const trialRecruitStartDate = subtractDays(trialShortageStartDate, trialLeadDays);
   const paidRecruitStartDate = subtractDays(paidShortageStartDate, paidLeadDays);
-  const trialStaffingSuggestion = buildStaffingSuggestion(trialGapTeachers, form.trial.teacherRows);
-  const paidStaffingSuggestion = buildStaffingSuggestion(paidGapTeachers, form.paid.teacherRows);
+  const trialStaffingSuggestion = buildStaffingSuggestion(
+    trialShortageMetrics.recommendedShortageTeacherCount,
+    form.trial.teacherRows
+  );
+  const paidStaffingSuggestion = buildStaffingSuggestion(
+    paidShortageMetrics.recommendedShortageTeacherCount,
+    form.paid.teacherRows
+  );
 
   return {
     cycleSummary: {
@@ -1300,7 +1350,10 @@ function calculateSimulatorResults(form) {
       )}%`,
       supplyClasses: trialSupplyClasses,
       gapClasses: trialGapClasses,
-      shortageTeacherCount: trialGapTeachers,
+      shortageTeacherCount: trialShortageMetrics.shortageTeacherCount,
+      shortageTeacherCountDisplay: trialShortageMetrics.shortageTeacherCountDisplay,
+      recommendedShortageTeacherCount: trialShortageMetrics.recommendedShortageTeacherCount,
+      hasRoundedShortageRecommendation: trialShortageMetrics.hasRoundedRecommendation,
       shortageStartDate: trialShortageStartDate,
       recruitmentDays: trialRecruitmentDays,
       trainingDays: trialTrainingDays,
@@ -1318,7 +1371,8 @@ function calculateSimulatorResults(form) {
       warningMessage: buildOverallWarningMessage(
         "体验课",
         trialWarningLevel,
-        trialGapTeachers,
+        trialShortageMetrics.shortageTeacherCount,
+        trialShortageMetrics.recommendedShortageTeacherCount,
         trialGapClasses
       ),
       hiringMessage:
@@ -1341,7 +1395,10 @@ function calculateSimulatorResults(form) {
       )}%`,
       supplyClasses: paidSupplyClasses,
       gapClasses: paidGapClasses,
-      shortageTeacherCount: paidGapTeachers,
+      shortageTeacherCount: paidShortageMetrics.shortageTeacherCount,
+      shortageTeacherCountDisplay: paidShortageMetrics.shortageTeacherCountDisplay,
+      recommendedShortageTeacherCount: paidShortageMetrics.recommendedShortageTeacherCount,
+      hasRoundedShortageRecommendation: paidShortageMetrics.hasRoundedRecommendation,
       shortageStartDate: paidShortageStartDate,
       recruitmentDays: paidRecruitmentDays,
       trainingDays: paidTrainingDays,
@@ -1359,7 +1416,8 @@ function calculateSimulatorResults(form) {
       warningMessage: buildOverallWarningMessage(
         "正价课",
         paidWarningLevel,
-        paidGapTeachers,
+        paidShortageMetrics.shortageTeacherCount,
+        paidShortageMetrics.recommendedShortageTeacherCount,
         paidGapClasses
       ),
       hiringMessage:

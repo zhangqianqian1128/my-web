@@ -570,7 +570,10 @@
         <span class="level-badge level-<%= result[courseMode].warningLevel %>">
           <%= warningLabelMap[result[courseMode].warningLevel] || result[courseMode].warningLevel %>
         </span>
-        <strong>折算缺口老师数：<%= result[courseMode].shortageTeacherCount %> 名</strong>
+        <strong>折算缺口老师数：<%= result[courseMode].shortageTeacherCountDisplay %> 名</strong>
+        <% if (result[courseMode].hasRoundedShortageRecommendation) { %>
+          <span class="muted">建议按 <%= result[courseMode].recommendedShortageTeacherCount %> 名储备</span>
+        <% } %>
       </div>
       <p class="result-note"><%= result[courseMode].warningMessage %></p>
     </article>
@@ -628,7 +631,7 @@
             <details class="inline-disclosure tool-disclosure">
               <summary>查看字段说明</summary>
               <div class="disclosure-body">
-                <p class="field-help">需求班次数：按“预计到课人数 ÷ 每班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再结合“周一到周日班次占比”折算有效周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
+                <p class="field-help">需求班次数：按“预计到课人数 ÷ 每班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再结合“周一到周日班次占比”折算有效周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算，结果展示为小数；招聘建议按整数向上取整。</p>
                 <p class="field-help">当前已展开的热门时段占比为 <strong><%= result.trial.slotRatioSumDisplay %></strong>，其余 <strong><%= result.trial.remainingOrdinaryRatioDisplay %></strong> 视为普通时段，当前不单独展开预测。</p>
                 <p class="field-help">当前轻量版整体供给仍只录入“周课次”，还没有单独录入老师在周一到周日的不同供给能力，因此系统先按班次占比近似拆分尾周影响。</p>
                 <p class="field-help">招聘提前量按“缺口开始时间 -（招聘周期 + 培训周期）”反推。当前轻量版把预测周期开始日作为缺口开始时间，用于判断最晚启动招聘的时间点。</p>
@@ -639,7 +642,7 @@
               <summary>查看字段说明</summary>
               <div class="disclosure-body">
                 <p class="field-help">预计正价承载人数 = 当前在课底盘 - 续费流失人数 + 预测新增入课人数。本页默认“当前总在课人数”已经包含本期待续费人数。</p>
-                <p class="field-help">需求班次数：按“预计承载学员数 × 每生周课次 × 预测周期有效周数 ÷ 班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再结合“周一到周日班次占比”折算有效周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
+                <p class="field-help">需求班次数：按“预计承载学员数 × 每生周课次 × 预测周期有效周数 ÷ 班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再结合“周一到周日班次占比”折算有效周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算，结果展示为小数；招聘建议按整数向上取整。</p>
                 <p class="field-help">当前已展开的热门时段占比为 <strong><%= result.paid.slotRatioSumDisplay %></strong>，其余 <strong><%= result.paid.remainingOrdinaryRatioDisplay %></strong> 视为普通时段，当前不单独展开预测。</p>
                 <p class="field-help">当前轻量版整体供给仍只录入“周课次”，还没有单独录入老师在周一到周日的不同供给能力，因此系统先按班次占比近似拆分尾周影响。</p>
                 <p class="field-help">招聘提前量按“缺口开始时间 -（招聘周期 + 培训周期）”反推。当前轻量版把预测周期开始日作为缺口开始时间，用于判断最晚启动招聘的时间点。</p>
@@ -678,7 +681,12 @@
                 <td><%= result.trial.requiredClasses %></td>
                 <td><%= result.trial.supplyClasses %></td>
                 <td><%= result.trial.gapClasses %></td>
-                <td><%= result.trial.shortageTeacherCount %></td>
+                <td>
+                  <%= result.trial.shortageTeacherCountDisplay %>
+                  <% if (result.trial.hasRoundedShortageRecommendation) { %>
+                    <span class="muted">（建议按 <%= result.trial.recommendedShortageTeacherCount %> 名）</span>
+                  <% } %>
+                </td>
                 <td><span class="level-badge level-<%= result.trial.warningLevel %>"><%= warningLabelMap[result.trial.warningLevel] || result.trial.warningLevel %></span></td>
                 <td><%= result.trial.warningMessage %></td>
               <% } else { %>
@@ -686,7 +694,12 @@
                 <td><%= result.paid.requiredClasses %></td>
                 <td><%= result.paid.supplyClasses %></td>
                 <td><%= result.paid.gapClasses %></td>
-                <td><%= result.paid.shortageTeacherCount %></td>
+                <td>
+                  <%= result.paid.shortageTeacherCountDisplay %>
+                  <% if (result.paid.hasRoundedShortageRecommendation) { %>
+                    <span class="muted">（建议按 <%= result.paid.recommendedShortageTeacherCount %> 名）</span>
+                  <% } %>
+                </td>
                 <td><span class="level-badge level-<%= result.paid.warningLevel %>"><%= warningLabelMap[result.paid.warningLevel] || result.paid.warningLevel %></span></td>
                 <td><%= result.paid.warningMessage %></td>
               <% } %>
