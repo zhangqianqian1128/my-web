@@ -608,10 +608,12 @@
       </div>
       <p class="result-note"><%= result[courseMode].hiringMessage %></p>
       <% if (result[courseMode].staffingSuggestion.primaryOption) { %>
-        <p class="field-help">优先方案：<strong><%= result[courseMode].staffingSuggestion.primaryOption %></strong></p>
+        <p class="field-help">方案 1：<strong><%= result[courseMode].staffingSuggestion.primaryOption %></strong></p>
       <% } %>
       <% if (result[courseMode].staffingSuggestion.alternatives.length > 0) { %>
-        <p class="field-help">备选方案：<%= result[courseMode].staffingSuggestion.alternatives.join("；或 ") %></p>
+        <% result[courseMode].staffingSuggestion.alternatives.forEach((option, index) => { %>
+          <p class="field-help">方案 <%= index + 2 %>：<%= option %></p>
+        <% }) %>
       <% } %>
       <p class="field-help"><%= result[courseMode].staffingSuggestion.assumption %></p>
     </article>
