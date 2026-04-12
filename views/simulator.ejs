@@ -692,6 +692,7 @@
     const showSettingsButton = document.querySelector("[data-show-predictor-settings]");
     const template = document.getElementById("slot-row-template");
     const form = document.querySelector('form[action^="/forecast/simulator/"]');
+    const activeCourseMode = "<%= courseMode %>";
 
     function setupHoverDisclosures() {
       const supportsHover = () => window.matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -1177,10 +1178,10 @@
           formatPercentInput(input);
         });
 
-        const trialOk = validateRatioGroup("trial", "体验课");
-        const paidOk = validateRatioGroup("paid", "正价课");
+        const activeGroupLabel = activeCourseMode === "paid" ? "正价课" : "体验课";
+        const activeGroupOk = validateRatioGroup(activeCourseMode, activeGroupLabel);
 
-        if (!trialOk || !paidOk) {
+        if (!activeGroupOk) {
           event.preventDefault();
         }
       });

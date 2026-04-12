@@ -720,7 +720,7 @@ function summarizeTeacherStageRows(rows) {
   };
 }
 
-function validateSimulatorForm(form) {
+function validateSimulatorForm(form, courseMode = "all") {
   if (!isValidDateString(form.period.startDate) || !isValidDateString(form.period.endDate)) {
     return "预测周期的开始日期和结束日期必须是有效日期。";
   }
@@ -733,58 +733,63 @@ function validateSimulatorForm(form) {
     return "汇总维度无效。";
   }
 
-  const numberChecks = [
-    [form.trial.assignedLeads, "体验课：预测周期分配线索数", { min: 0 }],
-    [form.trial.classSize, "体验课：每班级人数", { min: 1 }],
-    [form.trial.recruitmentDays, "体验课：老师招聘周期", { min: 0 }],
-    [form.trial.trainingDays, "体验课：老师入职培训周期", { min: 0 }],
-    [form.paid.currentStudents, "正价课：当前总在课人数", { min: 0 }],
-    [form.paid.renewalDueStudents, "正价课：其中本期待续费人数", { min: 0 }],
-    [form.paid.salesConvertedStarts, "正价课：预测周期销售转化入课人数", { min: 0 }],
-    [form.paid.ecomStarts, "正价课：预测周期电商新签入课人数", { min: 0 }],
-    [form.paid.studentWeeklyClasses, "正价课：每生周课次", { min: 0 }],
-    [form.paid.classSize, "正价课：班级人数", { min: 1 }],
-    [form.paid.recruitmentDays, "正价课：老师招聘周期", { min: 0 }],
-    [form.paid.trainingDays, "正价课：老师入职培训周期", { min: 0 }],
-  ];
+  const courseModes =
+    courseMode === "trial" || courseMode === "paid" ? [courseMode] : ["trial", "paid"];
 
-  for (const [value, label, options] of numberChecks) {
-    const result = parseRequiredNumber(value, label, options);
-    if (!result.ok) {
-      return result.message;
+  for (const activeCourseMode of courseModes) {
+    const numberChecks =
+      activeCourseMode === "trial"
+        ? [
+            [form.trial.assignedLeads, "体验课：预测周期分配线索数", { min: 0 }],
+            [form.trial.classSize, "体验课：每班级人数", { min: 1 }],
+            [form.trial.recruitmentDays, "体验课：老师招聘周期", { min: 0 }],
+            [form.trial.trainingDays, "体验课：老师入职培训周期", { min: 0 }],
+          ]
+        : [
+            [form.paid.currentStudents, "正价课：当前总在课人数", { min: 0 }],
+            [form.paid.renewalDueStudents, "正价课：其中本期待续费人数", { min: 0 }],
+            [form.paid.salesConvertedStarts, "正价课：预测周期销售转化入课人数", { min: 0 }],
+            [form.paid.ecomStarts, "正价课：预测周期电商新签入课人数", { min: 0 }],
+            [form.paid.studentWeeklyClasses, "正价课：每生周课次", { min: 0 }],
+            [form.paid.classSize, "正价课：班级人数", { min: 1 }],
+            [form.paid.recruitmentDays, "正价课：老师招聘周期", { min: 0 }],
+            [form.paid.trainingDays, "正价课：老师入职培训周期", { min: 0 }],
+          ];
+
+    for (const [value, label, options] of numberChecks) {
+      const result = parseRequiredNumber(value, label, options);
+      if (!result.ok) {
+        return result.message;
+      }
     }
-  }
 
-  const percentChecks = [
-    [form.trial.attendRate, "体验课：预测周期到课率", { min: 0, max: PERCENTAGE_MAX }],
-    [form.paid.renewalChurnRate, "正价课：续费流失率", { min: 0, max: PERCENTAGE_MAX }],
-  ];
+    const percentChecks =
+      activeCourseMode === "trial"
+        ? [[form.trial.attendRate, "体验课：预测周期到课率", { min: 0, max: PERCENTAGE_MAX }]]
+        : [[form.paid.renewalChurnRate, "正价课：续费流失率", { min: 0, max: PERCENTAGE_MAX }]];
 
-  for (const [value, label, options] of percentChecks) {
-    const result = parseRequiredPercent(value, label, options);
-    if (!result.ok) {
-      return result.message;
+    for (const [value, label, options] of percentChecks) {
+      const result = parseRequiredPercent(value, label, options);
+      if (!result.ok) {
+        return result.message;
+      }
     }
-  }
 
-  const trialTeacherError = validateTeacherStageRows(form.trial.teacherRows, "体验课师资配置");
-  if (trialTeacherError) {
-    return trialTeacherError;
-  }
+    const teacherError =
+      activeCourseMode === "trial"
+        ? validateTeacherStageRows(form.trial.teacherRows, "体验课师资配置")
+        : validateTeacherStageRows(form.paid.teacherRows, "正价课师资配置");
+    if (teacherError) {
+      return teacherError;
+    }
 
-  const paidTeacherError = validateTeacherStageRows(form.paid.teacherRows, "正价课师资配置");
-  if (paidTeacherError) {
-    return paidTeacherError;
-  }
-
-  const trialSlotError = validateSlotRows(form.trial.slotRows, "体验课");
-  if (trialSlotError) {
-    return trialSlotError;
-  }
-
-  const paidSlotError = validateSlotRows(form.paid.slotRows, "正价课");
-  if (paidSlotError) {
-    return paidSlotError;
+    const slotError =
+      activeCourseMode === "trial"
+        ? validateSlotRows(form.trial.slotRows, "体验课")
+        : validateSlotRows(form.paid.slotRows, "正价课");
+    if (slotError) {
+      return slotError;
+    }
   }
 
   return "";

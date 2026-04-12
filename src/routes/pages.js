@@ -77,7 +77,7 @@ router.get("/forecast/simulator", (req, res) => {
 router.get("/forecast/simulator/trial", (req, res) => {
   const db = getDb();
   const simulatorForm = hydrateSimulatorForm(getSavedPredictorConfig(db, CONFIG_KEYS.simulatorTrial));
-  const errorMessage = validateSimulatorForm(simulatorForm);
+  const errorMessage = validateSimulatorForm(simulatorForm, "trial");
   const result = errorMessage ? null : calculateSimulatorResults(simulatorForm);
 
   res.render(
@@ -95,7 +95,7 @@ router.get("/forecast/simulator/trial", (req, res) => {
 router.get("/forecast/simulator/paid", (req, res) => {
   const db = getDb();
   const simulatorForm = hydrateSimulatorForm(getSavedPredictorConfig(db, CONFIG_KEYS.simulatorPaid));
-  const errorMessage = validateSimulatorForm(simulatorForm);
+  const errorMessage = validateSimulatorForm(simulatorForm, "paid");
   const result = errorMessage ? null : calculateSimulatorResults(simulatorForm);
 
   res.render(
@@ -113,7 +113,7 @@ router.get("/forecast/simulator/paid", (req, res) => {
 router.post("/forecast/simulator/trial", (req, res) => {
   const db = getDb();
   const simulatorForm = normalizeSimulatorInput(req.body);
-  const errorMessage = validateSimulatorForm(simulatorForm);
+  const errorMessage = validateSimulatorForm(simulatorForm, "trial");
 
   if (errorMessage) {
     res
@@ -140,7 +140,7 @@ router.post("/forecast/simulator/trial", (req, res) => {
 router.post("/forecast/simulator/paid", (req, res) => {
   const db = getDb();
   const simulatorForm = normalizeSimulatorInput(req.body);
-  const errorMessage = validateSimulatorForm(simulatorForm);
+  const errorMessage = validateSimulatorForm(simulatorForm, "paid");
 
   if (errorMessage) {
     res
