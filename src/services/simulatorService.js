@@ -125,6 +125,10 @@ function computeWeekCount(startDate, endDate) {
   return Math.max(1, Math.ceil(diffDaysInclusive(startDate, endDate) / 7));
 }
 
+function computeWeekUnits(startDate, endDate) {
+  return roundTo(diffDaysInclusive(startDate, endDate) / 7, 2);
+}
+
 function buildDefaultSlotRows(rows) {
   if (rows && rows.length > 0) {
     return rows;
@@ -870,9 +874,12 @@ function validateSimulatorForm(form, courseMode = "all") {
 
 function buildOverallWarningMessage(type, warningLevel, shortageTeacherCount, gapClasses) {
   const missingClasses = Math.abs(Number(gapClasses || 0));
+  const missingClassesDisplay = Number.isInteger(missingClasses)
+    ? String(missingClasses)
+    : formatFixed(missingClasses, 2);
 
   if (warningLevel === "red") {
-    return `${type}师资不足，预计缺 ${shortageTeacherCount} 名老师，缺口 ${missingClasses} 个班次`;
+    return `${type}师资不足，预计缺 ${shortageTeacherCount} 名老师，缺口 ${missingClassesDisplay} 个班次`;
   }
 
   if (warningLevel === "orange") {
@@ -992,6 +999,8 @@ function getCourseMeta(courseMode) {
 
 function calculateSimulatorResults(form) {
   const weekCount = computeWeekCount(form.period.startDate, form.period.endDate);
+  const weekUnits = computeWeekUnits(form.period.startDate, form.period.endDate);
+  const dayCount = diffDaysInclusive(form.period.startDate, form.period.endDate);
 
   const trialAssignedLeads = Number(form.trial.assignedLeads);
   const trialAttendRate = parseRequiredPercent(form.trial.attendRate, "体验课到课率").value;
@@ -1002,10 +1011,10 @@ function calculateSimulatorResults(form) {
 
   const trialArrivals = roundTo(trialAssignedLeads * trialAttendRate, 2);
   const trialRequiredClasses = trialArrivals > 0 ? Math.ceil(trialArrivals / trialClassSize) : 0;
-  const trialSupplyClasses = trialTeacherSummary.weeklySupplyClasses * weekCount;
-  const trialGapClasses = trialSupplyClasses - trialRequiredClasses;
+  const trialSupplyClasses = roundTo(trialTeacherSummary.weeklySupplyClasses * weekUnits, 2);
+  const trialGapClasses = roundTo(trialSupplyClasses - trialRequiredClasses, 2);
   const trialWeeklyRequiredClasses =
-    trialRequiredClasses > 0 ? Math.ceil(trialRequiredClasses / weekCount) : 0;
+    trialRequiredClasses > 0 ? Math.ceil(trialRequiredClasses / weekUnits) : 0;
   const trialSlotRatioSum = sumSlotRatios(form.trial.slotRows);
   const trialUtilization = safeDivide(trialRequiredClasses, trialSupplyClasses);
   const trialWarningLevel = getUtilizationWarningLevel(trialUtilization);
@@ -1035,12 +1044,12 @@ function calculateSimulatorResults(form) {
   );
   const paidRequiredClasses =
     paidProjectedStudents > 0
-      ? Math.ceil((paidProjectedStudents * paidStudentWeeklyClasses * weekCount) / paidClassSize)
+      ? Math.ceil((paidProjectedStudents * paidStudentWeeklyClasses * weekUnits) / paidClassSize)
       : 0;
-  const paidSupplyClasses = paidTeacherSummary.weeklySupplyClasses * weekCount;
-  const paidGapClasses = paidSupplyClasses - paidRequiredClasses;
+  const paidSupplyClasses = roundTo(paidTeacherSummary.weeklySupplyClasses * weekUnits, 2);
+  const paidGapClasses = roundTo(paidSupplyClasses - paidRequiredClasses, 2);
   const paidWeeklyRequiredClasses =
-    paidRequiredClasses > 0 ? Math.ceil(paidRequiredClasses / weekCount) : 0;
+    paidRequiredClasses > 0 ? Math.ceil(paidRequiredClasses / weekUnits) : 0;
   const paidSlotRatioSum = sumSlotRatios(form.paid.slotRows);
   const paidUtilization = safeDivide(paidRequiredClasses, paidSupplyClasses);
   const paidWarningLevel = getUtilizationWarningLevel(paidUtilization);
@@ -1080,14 +1089,17 @@ function calculateSimulatorResults(form) {
       endDate: form.period.endDate,
       rangeLabel: formatRangeLabel(form.period.startDate, form.period.endDate),
       weekCount,
-      dayCount: diffDaysInclusive(form.period.startDate, form.period.endDate),
+      weekUnits,
+      weekUnitsDisplay: formatFixed(weekUnits, 2),
+      dayCount,
       summaryGranularity: form.period.summaryGranularity,
     },
     notes: [
-      `当前轻量版先按整体预测周期汇总输出，预测周期共 ${weekCount} 周。`,
+      `当前轻量版先按整体预测周期汇总输出，本次按 ${dayCount} 天折算为 ${formatFixed(weekUnits, 2)} 周进行试算。`,
       "正价课预计承载人数按“当前在课底盘 - 续费流失人数 + 预测新增入课人数”计算，避免把待续费学员重复计入。",
       "热门时段按周均需求老师数试算，不直接拿整个预测周期总班次数与单周老师供给比较。",
       "未配置的剩余时段占比会视为普通时段，当前不单独展开预测。",
+      "整体供给当前只有“周课次”输入，因此尾周会按实际天数折算；尚未细化到周一到周日分别计算老师供给。",
       "热门时段供给当前按“该课程类型所有老师均可参与该时段供给”进行快速试算，这不是实际排班能力。",
     ],
     trial: {

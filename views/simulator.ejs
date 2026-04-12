@@ -40,7 +40,7 @@
     </div>
     <div class="note-list compact-note-list recent-result-tags">
       <span class="tag">周期：<%= result.cycleSummary.rangeLabel %></span>
-      <span class="tag">预测周数：<%= result.cycleSummary.weekCount %> 周</span>
+      <span class="tag">折算周数：<%= result.cycleSummary.weekUnitsDisplay %> 周</span>
       <span class="tag">当前课程：<%= courseMeta.label %></span>
     </div>
     <p class="field-help">页面已按当前已保存配置自动展示最近一次预测结果。点击右侧“重新预测”即可展开设置并重新试算。</p>
@@ -528,8 +528,9 @@
             <details class="inline-disclosure tool-disclosure">
               <summary>查看字段说明</summary>
               <div class="disclosure-body">
-                <p class="field-help">需求班次数：按“预计到课人数 ÷ 每班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再乘以预测周期周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
+                <p class="field-help">需求班次数：按“预计到课人数 ÷ 每班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再按预测周期天数折算周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
                 <p class="field-help">当前已展开的热门时段占比为 <strong><%= result.trial.slotRatioSumDisplay %></strong>，其余 <strong><%= result.trial.remainingOrdinaryRatioDisplay %></strong> 视为普通时段，当前不单独展开预测。</p>
+                <p class="field-help">当前轻量版整体供给只录入“周课次”，还没有细分到周一到周日，因此尾周会按天数比例折算，不会再把不足 7 天的周期当整周计算。</p>
                 <p class="field-help">招聘提前量按“缺口开始时间 -（招聘周期 + 培训周期）”反推。当前轻量版把预测周期开始日作为缺口开始时间，用于判断最晚启动招聘的时间点。</p>
               </div>
             </details>
@@ -538,8 +539,9 @@
               <summary>查看字段说明</summary>
               <div class="disclosure-body">
                 <p class="field-help">预计正价承载人数 = 当前在课底盘 - 续费流失人数 + 预测新增入课人数。本页默认“当前总在课人数”已经包含本期待续费人数。</p>
-                <p class="field-help">需求班次数：按“预计承载学员数 × 每生周课次 × 预测周期周数 ÷ 班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再乘以预测周期周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
+                <p class="field-help">需求班次数：按“预计承载学员数 × 每生周课次 × 预测周期折算周数 ÷ 班级人数”向上取整。供给班次数：按师资分阶段配置中 6 行的“人数 × 周课次”汇总后，再按预测周期天数折算周数计算。差额班次数：供给班次数 - 需求班次数。折算缺口老师数：当差额为负时，优先按“全职正式期”的周课次折算。</p>
                 <p class="field-help">当前已展开的热门时段占比为 <strong><%= result.paid.slotRatioSumDisplay %></strong>，其余 <strong><%= result.paid.remainingOrdinaryRatioDisplay %></strong> 视为普通时段，当前不单独展开预测。</p>
+                <p class="field-help">当前轻量版整体供给只录入“周课次”，还没有细分到周一到周日，因此尾周会按天数比例折算，不会再把不足 7 天的周期当整周计算。</p>
                 <p class="field-help">招聘提前量按“缺口开始时间 -（招聘周期 + 培训周期）”反推。当前轻量版把预测周期开始日作为缺口开始时间，用于判断最晚启动招聘的时间点。</p>
               </div>
             </details>
@@ -650,7 +652,7 @@
     <div class="disclosure-body">
       <div class="note-list">
         <span class="tag">周期：<%= result.cycleSummary.rangeLabel %></span>
-        <span class="tag">预测周数：<%= result.cycleSummary.weekCount %> 周</span>
+        <span class="tag">折算周数：<%= result.cycleSummary.weekUnitsDisplay %> 周</span>
         <span class="tag">汇总维度：<%= summaryGranularityOptions.find((option) => option.value === result.cycleSummary.summaryGranularity)?.label || result.cycleSummary.summaryGranularity %></span>
       </div>
       <div class="module-list">
