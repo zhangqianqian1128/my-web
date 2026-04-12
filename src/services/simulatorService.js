@@ -720,6 +720,79 @@ function summarizeTeacherStageRows(rows) {
   };
 }
 
+function getTeacherTypeBaseline(rows, typeKey) {
+  const regularRow = (rows || []).find((row) => row.typeKey === typeKey && row.stageKey === "regular");
+  const regularCapacity = Math.max(0, Number(regularRow?.weeklyClasses) || 0);
+
+  if (regularCapacity > 0) {
+    return regularCapacity;
+  }
+
+  return Math.max(
+    0,
+    ...(rows || [])
+      .filter((row) => row.typeKey === typeKey)
+      .map((row) => Math.max(0, Number(row.weeklyClasses) || 0))
+  );
+}
+
+function buildStaffingSuggestion(shortageTeacherCount, teacherRows) {
+  if (shortageTeacherCount <= 0) {
+    return {
+      primaryOption: "",
+      alternatives: [],
+      assumption: "当前暂无明确新增缺口，暂不需要新增全职/兼职组合建议。",
+    };
+  }
+
+  const fullTimeBaseline = getTeacherTypeBaseline(teacherRows, "full_time");
+  const partTimeBaseline = getTeacherTypeBaseline(teacherRows, "part_time");
+
+  if (fullTimeBaseline <= 0 && partTimeBaseline <= 0) {
+    return {
+      primaryOption: "",
+      alternatives: [],
+      assumption: "当前全职和兼职周课次基准都为 0，暂时无法按现有口径折算招聘组合。",
+    };
+  }
+
+  const alternatives = [];
+  let primaryOption = "";
+
+  if (fullTimeBaseline > 0) {
+    primaryOption = `${shortageTeacherCount} 个全职`;
+  } else {
+    primaryOption = `${Math.ceil(shortageTeacherCount)} 个兼职`;
+  }
+
+  if (fullTimeBaseline > 0 && partTimeBaseline > 0) {
+    const allPartTimeCount = Math.ceil((shortageTeacherCount * fullTimeBaseline) / partTimeBaseline);
+    alternatives.push(`${allPartTimeCount} 个兼职`);
+
+    if (shortageTeacherCount >= 2) {
+      const mixedPartTimeCount = Math.ceil(
+        ((shortageTeacherCount - 1) * fullTimeBaseline) / partTimeBaseline
+      );
+      alternatives.unshift(`1 个全职 + ${mixedPartTimeCount} 个兼职`);
+    }
+  }
+
+  if (!primaryOption && partTimeBaseline > 0) {
+    primaryOption = `${Math.ceil(shortageTeacherCount)} 个兼职`;
+  }
+
+  return {
+    primaryOption,
+    alternatives: alternatives.filter((option, index, array) => option && array.indexOf(option) === index),
+    assumption:
+      fullTimeBaseline > 0 && partTimeBaseline > 0
+        ? `按当前“全职 ${fullTimeBaseline} 班/周、兼职 ${partTimeBaseline} 班/周”的正式期口径折算，仅用于快速试算。`
+        : fullTimeBaseline > 0
+          ? `按当前“全职 ${fullTimeBaseline} 班/周”的正式期口径折算，仅用于快速试算。`
+          : `按当前“兼职 ${partTimeBaseline} 班/周”的正式期口径折算，仅用于快速试算。`,
+  };
+}
+
 function validateSimulatorForm(form, courseMode = "all") {
   if (!isValidDateString(form.period.startDate) || !isValidDateString(form.period.endDate)) {
     return "预测周期的开始日期和结束日期必须是有效日期。";
@@ -998,6 +1071,8 @@ function calculateSimulatorResults(form) {
   const paidLeadDays = paidRecruitmentDays + paidTrainingDays;
   const trialRecruitStartDate = subtractDays(trialShortageStartDate, trialLeadDays);
   const paidRecruitStartDate = subtractDays(paidShortageStartDate, paidLeadDays);
+  const trialStaffingSuggestion = buildStaffingSuggestion(trialGapTeachers, form.trial.teacherRows);
+  const paidStaffingSuggestion = buildStaffingSuggestion(paidGapTeachers, form.paid.teacherRows);
 
   return {
     cycleSummary: {
@@ -1037,6 +1112,7 @@ function calculateSimulatorResults(form) {
       weeklySupplyClasses: trialTeacherSummary.weeklySupplyClasses,
       recruitLeadDays: trialLeadDays,
       latestRecruitStartDate: trialRecruitStartDate,
+      staffingSuggestion: trialStaffingSuggestion,
       utilization: trialUtilization,
       warningLevel: trialWarningLevel,
       warningMessage: buildOverallWarningMessage(
@@ -1074,6 +1150,7 @@ function calculateSimulatorResults(form) {
       weeklySupplyClasses: paidTeacherSummary.weeklySupplyClasses,
       recruitLeadDays: paidLeadDays,
       latestRecruitStartDate: paidRecruitStartDate,
+      staffingSuggestion: paidStaffingSuggestion,
       utilization: paidUtilization,
       warningLevel: paidWarningLevel,
       warningMessage: buildOverallWarningMessage(
