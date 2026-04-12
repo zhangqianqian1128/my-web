@@ -4,6 +4,12 @@ const NEW_TOGGLE_OPTIONS = [
   { value: "是", label: "是" },
   { value: "否", label: "否" },
 ];
+const HEADTEACHER_STAGE_OPTIONS = [
+  { value: "培训期", label: "培训期" },
+  { value: "新手期", label: "新手期" },
+  { value: "正式期", label: "正式期" },
+  { value: "特殊异动处理期", label: "特殊异动处理期" },
+];
 
 const severityRank = { red: 0, orange: 1, yellow: 2, green: 3 };
 const PERCENTAGE_MAX = 100;
@@ -113,6 +119,54 @@ function parseRequiredPercent(value, label, options = {}) {
   };
 }
 
+function normalizeTakeNewValue(value) {
+  const normalizedValue = String(value ?? "").trim();
+  const takeNewMap = {
+    是: "是",
+    否: "否",
+    y: "是",
+    Y: "是",
+    yes: "是",
+    YES: "是",
+    true: "是",
+    TRUE: "是",
+    1: "是",
+    接新: "是",
+    可接新: "是",
+    n: "否",
+    N: "否",
+    no: "否",
+    NO: "否",
+    false: "否",
+    FALSE: "否",
+    0: "否",
+    不接新: "否",
+  };
+
+  return takeNewMap[normalizedValue] || "";
+}
+
+function normalizeHeadteacherStage(value) {
+  const normalizedValue = String(value ?? "").trim();
+  const stageMap = {
+    1: "培训期",
+    培训期: "培训期",
+    培训: "培训期",
+    2: "新手期",
+    新手期: "新手期",
+    新手: "新手期",
+    3: "正式期",
+    正式期: "正式期",
+    正式: "正式期",
+    4: "特殊异动处理期",
+    特殊异动处理期: "特殊异动处理期",
+    特殊异动期: "特殊异动处理期",
+    特殊异动: "特殊异动处理期",
+  };
+
+  return stageMap[normalizedValue] || "";
+}
+
 function buildDefaultHeadteacherRows(rows) {
   if (rows && rows.length > 0) {
     return rows;
@@ -121,6 +175,7 @@ function buildDefaultHeadteacherRows(rows) {
   return [
     {
       name: "李老师",
+      stage: "正式期",
       currentStudents: "235",
       serviceLimit: "250",
       canTakeNew: "是",
@@ -129,6 +184,7 @@ function buildDefaultHeadteacherRows(rows) {
     },
     {
       name: "周老师",
+      stage: "正式期",
       currentStudents: "220",
       serviceLimit: "250",
       canTakeNew: "否",
@@ -137,6 +193,7 @@ function buildDefaultHeadteacherRows(rows) {
     },
     {
       name: "陈老师",
+      stage: "正式期",
       currentStudents: "185",
       serviceLimit: "250",
       canTakeNew: "是",
@@ -145,6 +202,7 @@ function buildDefaultHeadteacherRows(rows) {
     },
     {
       name: "王老师",
+      stage: "新手期",
       currentStudents: "120",
       serviceLimit: "250",
       canTakeNew: "是",
@@ -156,7 +214,7 @@ function buildDefaultHeadteacherRows(rows) {
 
 function buildDefaultHeadteacherSimulatorForm() {
   return {
-    formVersion: 2,
+    formVersion: 3,
     period: {
       forecastMonth: "2026-05",
     },
@@ -184,7 +242,7 @@ function hydrateHeadteacherSimulatorForm(savedForm) {
   }
 
   return {
-    formVersion: 2,
+    formVersion: 3,
     period: {
       forecastMonth: String(savedForm.period?.forecastMonth ?? defaults.period.forecastMonth).trim(),
     },
@@ -217,6 +275,9 @@ function hydrateHeadteacherSimulatorForm(savedForm) {
       rows: buildDefaultHeadteacherRows(
         (savedForm.team?.rows || defaults.team.rows).map((row, index) => ({
           name: String(row?.name ?? defaults.team.rows[index]?.name ?? "").trim(),
+          stage:
+            normalizeHeadteacherStage(row?.stage ?? defaults.team.rows[index]?.stage) ||
+            String(row?.stage ?? defaults.team.rows[index]?.stage ?? "正式期").trim(),
           currentStudents: String(
             row?.currentStudents ?? defaults.team.rows[index]?.currentStudents ?? ""
           ).trim(),
@@ -236,6 +297,7 @@ function hydrateHeadteacherSimulatorForm(savedForm) {
 
 function normalizeHeadteacherRows(body, fallbackRows) {
   const nameValues = toArray(body["ht_name[]"] ?? body.ht_name);
+  const stageValues = toArray(body["ht_stage[]"] ?? body.ht_stage);
   const currentStudentsValues = toArray(
     body["ht_current_students[]"] ?? body.ht_current_students
   );
@@ -245,6 +307,7 @@ function normalizeHeadteacherRows(body, fallbackRows) {
   const noteValues = toArray(body["ht_notes[]"] ?? body.ht_notes);
   const rowCount = Math.max(
     nameValues.length,
+    stageValues.length,
     currentStudentsValues.length,
     serviceLimitValues.length,
     canTakeNewValues.length,
@@ -256,18 +319,22 @@ function normalizeHeadteacherRows(body, fallbackRows) {
 
   for (let index = 0; index < rowCount; index += 1) {
     const name = String(nameValues[index] ?? "").trim();
+    const rawStage = String(stageValues[index] ?? "").trim();
     const currentStudents = String(currentStudentsValues[index] ?? "").trim();
     const serviceLimit = String(serviceLimitValues[index] ?? "").trim();
-    const canTakeNew = String(canTakeNewValues[index] ?? "").trim();
+    const rawCanTakeNew = String(canTakeNewValues[index] ?? "").trim();
     const newCapacity = String(newCapacityValues[index] ?? "").trim();
     const notes = String(noteValues[index] ?? "").trim();
+    const stage = normalizeHeadteacherStage(rawStage) || rawStage;
+    const canTakeNew = normalizeTakeNewValue(rawCanTakeNew) || rawCanTakeNew;
 
-    if (!name && !currentStudents && !serviceLimit && !canTakeNew && !newCapacity && !notes) {
+    if (!name && !stage && !currentStudents && !serviceLimit && !canTakeNew && !newCapacity && !notes) {
       continue;
     }
 
     rows.push({
       name,
+      stage: stage || "正式期",
       currentStudents,
       serviceLimit,
       canTakeNew: canTakeNew || "否",
@@ -283,7 +350,7 @@ function normalizeHeadteacherSimulatorInput(body = {}) {
   const defaults = buildDefaultHeadteacherSimulatorForm();
 
   return {
-    formVersion: 2,
+    formVersion: 3,
     period: {
       forecastMonth: String(body.forecast_month ?? defaults.period.forecastMonth).trim(),
     },
@@ -353,6 +420,10 @@ function validateHeadteacherSimulatorForm(form) {
   for (const row of form.team.rows) {
     if (!row.name) {
       return "班主任姓名不能为空。";
+    }
+
+    if (!HEADTEACHER_STAGE_OPTIONS.some((option) => option.value === row.stage)) {
+      return `班主任 ${row.name} 的阶段填写无效。`;
     }
 
     if (!NEW_TOGGLE_OPTIONS.some((option) => option.value === row.canTakeNew)) {
@@ -555,6 +626,7 @@ function calculateHeadteacherSimulatorResults(form) {
 
     return {
       name: row.name,
+      stage: row.stage,
       currentStudents: currentStudentsValue,
       serviceLimit: serviceLimitValue,
       canTakeNew,
@@ -742,6 +814,7 @@ function buildHeadteacherSimulatorViewModel(options = {}) {
         ? options.showSettingsExpanded
         : !options.result || Boolean(options.errorMessage),
     newToggleOptions: NEW_TOGGLE_OPTIONS,
+    headteacherStageOptions: HEADTEACHER_STAGE_OPTIONS,
     predictorTabs,
     activePredictorTab: "headteacher",
   };
@@ -755,4 +828,5 @@ module.exports = {
   validateHeadteacherSimulatorForm,
   calculateHeadteacherSimulatorResults,
   NEW_TOGGLE_OPTIONS,
+  HEADTEACHER_STAGE_OPTIONS,
 };

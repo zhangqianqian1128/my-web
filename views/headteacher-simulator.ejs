@@ -119,16 +119,8 @@
           <p class="eyebrow">区域 C</p>
           <h3>班主任团队配置</h3>
         </div>
-        <div class="simulator-grid simulator-grid-3">
-          <label>
-            <span>单个班主任默认服务人数上限</span>
-            <input id="default-service-limit" name="default_service_limit" type="number" min="1" step="1" value="<%= simulatorForm.team.defaultServiceLimit %>" required />
-          </label>
-          <label>
-            <span>单个新班主任默认月接新上限</span>
-            <input id="default-new-intake-limit" name="default_new_intake_limit" type="number" min="1" step="1" value="<%= simulatorForm.team.defaultNewIntakeLimit %>" required />
-          </label>
-        </div>
+        <input id="default-service-limit" name="default_service_limit" type="hidden" value="<%= simulatorForm.team.defaultServiceLimit %>" />
+        <input id="default-new-intake-limit" name="default_new_intake_limit" type="hidden" value="<%= simulatorForm.team.defaultNewIntakeLimit %>" />
 
         <div class="slot-config-card">
           <details class="slot-editor" <%= result ? "" : "open" %>>
@@ -143,12 +135,33 @@
               </div>
             </summary>
             <div class="disclosure-body">
+              <details class="inline-disclosure compact-inline-disclosure">
+                <summary>批量粘贴添加班主任</summary>
+                <div class="disclosure-body">
+                  <p class="field-help">支持直接粘贴 Excel 六列：<strong>班主任姓名 / 当前服务学员数 / 服务人数上限 / 本月是否接新 / 本月可接新人数 / 备注</strong>。也支持五列，不填备注。</p>
+                  <p class="field-help">现支持七列：<strong>班主任姓名 / 阶段 / 当前服务学员数 / 服务人数上限 / 本月是否接新 / 本月可接新人数 / 备注</strong>；也支持六列不填备注。阶段可填：培训期、新手期、正式期、特殊异动处理期，或直接填 1/2/3/4。</p>
+                  <textarea class="slot-bulk-input" rows="4" data-team-bulk-input placeholder="李老师\t3\t235\t250\t是\t20\t成熟班主任&#10;周老师\t正式期\t220\t250\t否\t0\t本月以稳班为主"></textarea>
+                  <div class="action-row slot-bulk-actions">
+                    <button type="button" class="secondary-link" data-import-team-members>追加到班主任名单</button>
+                    <span class="field-help">不会覆盖已存在配置。</span>
+                  </div>
+                </div>
+              </details>
+
               <div class="team-member-rows" data-team-rows>
                 <% simulatorForm.team.rows.forEach((row) => { %>
                   <div class="team-member-row">
                     <label>
                       <span>班主任姓名</span>
                       <input name="ht_name[]" type="text" value="<%= row.name %>" required />
+                    </label>
+                    <label>
+                      <span>阶段</span>
+                      <select name="ht_stage[]" required>
+                        <% headteacherStageOptions.forEach((option) => { %>
+                          <option value="<%= option.value %>" <%= row.stage === option.value ? "selected" : "" %>><%= option.label %></option>
+                        <% }) %>
+                      </select>
                     </label>
                     <label>
                       <span>当前服务学员数</span>
@@ -317,6 +330,7 @@
             <summary>查看字段说明</summary>
             <div class="disclosure-body">
               <p class="field-help">服务人数上限影响“总服务容量”；本月可接新人数影响“本月接新容量”；当前服务学员数主要影响个人负载和风险提示。即使整体预警等级不变，这些容量数字也会直接变化。</p>
+              <p class="field-help">阶段字段当前用于配置与展示，便于区分培训期、新手期、正式期和特殊异动处理期；本版暂未按阶段自动改变计算口径。</p>
               <p class="field-help">当前平均每位班主任服务 <strong><%= result.teamSummary.currentAverageServiceStudents %></strong> 人，最高个人负载率约为 <strong><%= `${Math.round(result.teamSummary.highestLoadRatio * 100)}%` %></strong>。</p>
             </div>
           </details>
@@ -345,6 +359,7 @@
           <thead>
             <tr>
               <th>班主任姓名</th>
+              <th>阶段</th>
               <th>当前服务学员数</th>
               <th>服务人数上限</th>
               <th>当前负载率</th>
@@ -357,6 +372,7 @@
             <% result.teamRows.forEach((row) => { %>
               <tr>
                 <td><%= row.name %></td>
+                <td><%= row.stage %></td>
                 <td><%= row.currentStudents %></td>
                 <td><%= row.serviceLimit %></td>
                 <td><%= `${Math.round(row.loadUtilization * 100)}%` %></td>
@@ -402,6 +418,14 @@
       <input data-team-field="name" type="text" required />
     </label>
     <label>
+      <span>阶段</span>
+      <select data-team-field="stage" required>
+        <% headteacherStageOptions.forEach((option) => { %>
+          <option value="<%= option.value %>"><%= option.label %></option>
+        <% }) %>
+      </select>
+    </label>
+    <label>
       <span>当前服务学员数</span>
       <input data-team-field="current_students" type="number" min="0" step="1" value="0" required />
     </label>
@@ -436,6 +460,8 @@
     const template = document.getElementById("team-member-template");
     const rowsContainer = document.querySelector("[data-team-rows]");
     const addButton = document.querySelector("[data-add-team-member]");
+    const bulkInput = document.querySelector("[data-team-bulk-input]");
+    const importButton = document.querySelector("[data-import-team-members]");
     const defaultServiceLimitInput = document.getElementById("default-service-limit");
     const defaultNewIntakeLimitInput = document.getElementById("default-new-intake-limit");
 
@@ -554,6 +580,7 @@
 
       rowsContainer.querySelectorAll(".team-member-row").forEach((row) => {
         row.querySelector('[data-team-field="name"], input[name="ht_name[]"]').setAttribute("name", "ht_name[]");
+        row.querySelector('[data-team-field="stage"], select[name="ht_stage[]"]').setAttribute("name", "ht_stage[]");
         row
           .querySelector('[data-team-field="current_students"], input[name="ht_current_students[]"]')
           .setAttribute("name", "ht_current_students[]");
@@ -572,6 +599,54 @@
       });
     }
 
+    function normalizeTakeNewInput(rawValue) {
+      const normalizedValue = String(rawValue ?? "").trim();
+      const takeNewMap = {
+        是: "是",
+        否: "否",
+        y: "是",
+        Y: "是",
+        yes: "是",
+        YES: "是",
+        true: "是",
+        TRUE: "是",
+        1: "是",
+        接新: "是",
+        可接新: "是",
+        n: "否",
+        N: "否",
+        no: "否",
+        NO: "否",
+        false: "否",
+        FALSE: "否",
+        0: "否",
+        不接新: "否",
+      };
+
+      return takeNewMap[normalizedValue] || "";
+    }
+
+    function normalizeStageInput(rawValue) {
+      const normalizedValue = String(rawValue ?? "").trim();
+      const stageMap = {
+        "1": "培训期",
+        培训期: "培训期",
+        培训: "培训期",
+        "2": "新手期",
+        新手期: "新手期",
+        新手: "新手期",
+        "3": "正式期",
+        正式期: "正式期",
+        正式: "正式期",
+        "4": "特殊异动处理期",
+        特殊异动处理期: "特殊异动处理期",
+        特殊异动期: "特殊异动处理期",
+        特殊异动: "特殊异动处理期",
+      };
+
+      return stageMap[normalizedValue] || "";
+    }
+
     function syncTakeNewState(row) {
       const select = row.querySelector('select[name="ht_can_take_new[]"], [data-team-field="can_take_new"]');
       const newCapacityInput = row.querySelector('input[name="ht_new_capacity[]"], [data-team-field="new_capacity"]');
@@ -587,6 +662,64 @@
       }
     }
 
+    function appendTeamMemberRow(rowData = {}) {
+      if (!rowsContainer) {
+        return;
+      }
+
+      const fragment = template.content.cloneNode(true);
+      const tempWrapper = document.createElement("div");
+      tempWrapper.appendChild(fragment);
+      const row = tempWrapper.firstElementChild;
+
+      row.querySelector('[data-team-field="name"]').value = rowData.name || "";
+      row.querySelector('[data-team-field="stage"]').value = rowData.stage || "正式期";
+      row.querySelector('[data-team-field="current_students"]').value = rowData.currentStudents || "0";
+      row.querySelector('[data-team-field="service_limit"]').value =
+        rowData.serviceLimit || defaultServiceLimitInput?.value || "250";
+      row.querySelector('[data-team-field="can_take_new"]').value = rowData.canTakeNew || "否";
+      row.querySelector('[data-team-field="new_capacity"]').value =
+        rowData.newCapacity || defaultNewIntakeLimitInput?.value || "30";
+      row.querySelector('[data-team-field="notes"]').value = rowData.notes || "";
+
+      rowsContainer.appendChild(row);
+      bindRowNames();
+      syncTakeNewState(row);
+    }
+
+    function parseTeamBulkRow(line) {
+      const normalizedLine = line.trim();
+
+      if (!normalizedLine) {
+        return null;
+      }
+
+      const tabParts = normalizedLine.split("\t").map((part) => part.trim());
+      const commaParts = normalizedLine.split(/[，,]/).map((part) => part.trim());
+      const parts = tabParts.length >= 6 ? tabParts : commaParts.length >= 6 ? commaParts : null;
+
+      if (!parts) {
+        return null;
+      }
+
+      const stage = normalizeStageInput(parts[1]);
+      const canTakeNew = normalizeTakeNewInput(parts[4]);
+
+      if (!parts[0] || !stage || !parts[2] || !parts[3] || !canTakeNew || !parts[5]) {
+        return null;
+      }
+
+      return {
+        name: parts[0],
+        stage,
+        currentStudents: parts[2],
+        serviceLimit: parts[3],
+        canTakeNew,
+        newCapacity: parts[5],
+        notes: parts[6] || "",
+      };
+    }
+
     document.querySelectorAll("[data-percent-input]").forEach((input) => {
       formatPercentInput(input);
     });
@@ -599,15 +732,39 @@
 
     if (addButton && rowsContainer) {
       addButton.addEventListener("click", () => {
-        const fragment = template.content.cloneNode(true);
-        const tempWrapper = document.createElement("div");
-        tempWrapper.appendChild(fragment);
-        const row = tempWrapper.firstElementChild;
-        row.querySelector('[data-team-field="service_limit"]').value = defaultServiceLimitInput?.value || "250";
-        row.querySelector('[data-team-field="new_capacity"]').value = defaultNewIntakeLimitInput?.value || "30";
-        rowsContainer.appendChild(row);
-        bindRowNames();
-        syncTakeNewState(row);
+        appendTeamMemberRow();
+      });
+    }
+
+    if (importButton && bulkInput) {
+      importButton.addEventListener("click", () => {
+        const lines = bulkInput.value.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+
+        if (lines.length === 0) {
+          return;
+        }
+
+        const parsedRows = [];
+        const invalidLines = [];
+
+        lines.forEach((line, index) => {
+          const row = parseTeamBulkRow(line);
+
+          if (!row) {
+            invalidLines.push(index + 1);
+            return;
+          }
+
+          parsedRows.push(row);
+        });
+
+        if (invalidLines.length > 0) {
+          window.alert(`以下行格式无法识别，请检查后重试：第 ${invalidLines.join("、")} 行。`);
+          return;
+        }
+
+        parsedRows.forEach((row) => appendTeamMemberRow(row));
+        bulkInput.value = "";
       });
     }
 
